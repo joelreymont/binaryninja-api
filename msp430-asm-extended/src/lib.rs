@@ -359,4 +359,59 @@ mod tests {
             assert_eq!(inst.size(), 2);
         }
     }
+
+    // Real MSP430X instruction encodings from GCC msp430-elf-gcc 9.3.1
+    // Verified correct encodings from compiled test_simple.elf binary
+
+    #[test]
+    fn gcc_real_reta() {
+        // RETA - from test_simple.elf at 0x4416
+        let data = [0x10, 0x01];
+        let inst = decode(&data);
+        assert_eq!(inst, Ok(Instruction::Reta(Reta::new())));
+    }
+
+    #[test]
+    fn gcc_real_pushm_address_mode() {
+        // PUSHM.A #4, r15 - from test_simple.elf at 0x4424
+        let data = [0x3f, 0x14];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode PUSHM.A");
+        if let Ok(inst) = inst {
+            assert_eq!(inst.size(), 2);
+        }
+    }
+
+    #[test]
+    fn gcc_real_popm_address_mode() {
+        // POPM.A #4, r15 - from test_simple.elf at 0x442e
+        let data = [0x3c, 0x16];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode POPM.A");
+        if let Ok(inst) = inst {
+            assert_eq!(inst.size(), 2);
+        }
+    }
+
+    #[test]
+    fn gcc_real_rlam_address_mode() {
+        // RLAM.A #2, r15 - from test_simple.elf at 0x4434
+        let data = [0x4f, 0x06];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode RLAM.A");
+        if let Ok(inst) = inst {
+            assert_eq!(inst.size(), 2);
+        }
+    }
+
+    #[test]
+    fn gcc_real_rram_address_mode() {
+        // RRAM.A #2, r14 - from test_simple.elf at 0x4436
+        let data = [0x4e, 0x05];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode RRAM.A");
+        if let Ok(inst) = inst {
+            assert_eq!(inst.size(), 2);
+        }
+    }
 }
