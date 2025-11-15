@@ -663,54 +663,118 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
             il.set_flag(Flag::V, il.const_int(0, 0)).append();
             il.set_flag(Flag::C, il.const_int(0, 1)).append();
         }
-        // MSP430X extended instructions - Phase 4 LLIL lifting not yet implemented
-        Instruction::Mova(_inst) => {
-            // TODO: Implement MOVA LLIL lifting (20-bit move address)
-            il.unimplemented().append();
+        // MSP430X extended instructions
+        Instruction::Mova(inst) => {
+            // 20-bit move address - always uses 3-byte size
+            let src = lift_source_operand(inst.source(), 3, il);
+            msp430x_address_write(inst.destination(), il, src);
         }
-        Instruction::Cmpa(_inst) => {
-            // TODO: Implement CMPA LLIL lifting (20-bit compare address)
-            il.unimplemented().append();
+        Instruction::Cmpa(inst) => {
+            // 20-bit compare address
+            let src = lift_source_operand(inst.source(), 3, il);
+            let dest = lift_source_operand(inst.destination(), 3, il);
+            il.sub(3, dest, src)
+                .with_flag_write(FlagWrite::All)
+                .append();
         }
-        Instruction::Adda(_inst) => {
-            // TODO: Implement ADDA LLIL lifting (20-bit add address)
-            il.unimplemented().append();
+        Instruction::Adda(inst) => {
+            // 20-bit add address
+            let src = lift_source_operand(inst.source(), 3, il);
+            let dest = lift_source_operand(inst.destination(), 3, il);
+            let op = il.add(3, src, dest).with_flag_write(FlagWrite::All).build();
+            msp430x_address_write(inst.destination(), il, op);
         }
-        Instruction::Suba(_inst) => {
-            // TODO: Implement SUBA LLIL lifting (20-bit subtract address)
-            il.unimplemented().append();
+        Instruction::Suba(inst) => {
+            // 20-bit subtract address
+            let src = lift_source_operand(inst.source(), 3, il);
+            let dest = lift_source_operand(inst.destination(), 3, il);
+            let op = il.sub(3, dest, src).with_flag_write(FlagWrite::All).build();
+            msp430x_address_write(inst.destination(), il, op);
         }
-        Instruction::Calla(_inst) => {
-            // TODO: Implement CALLA LLIL lifting (20-bit call)
-            il.unimplemented().append();
+        Instruction::Calla(inst) => {
+            // 20-bit call - similar to CALL but with 3-byte addressing
+            let src = if let Operand::Immediate20(src) = inst.destination() {
+                il.const_ptr(*src as u64)
+            } else if let Operand::Immediate(src) = inst.destination() {
+                il.const_ptr(*src as u64)
+            } else {
+                lift_source_operand(inst.destination(), 3, il)
+            };
+            il.call(src).append();
         }
         Instruction::Reta(_inst) => {
-            // TODO: Implement RETA LLIL lifting (20-bit return)
-            il.unimplemented().append();
+            // 20-bit return - pop 3 bytes from stack
+            il.ret(il.pop(3)).append();
         }
-        Instruction::Rrcm(_inst) => {
-            // TODO: Implement RRCM LLIL lifting (rotate right through carry multiple)
-            il.unimplemented().append();
+        Instruction::Rrcm(inst) => {
+            // Rotate right through carry multiple times
+            let count = inst.count();
+            let reg = Register::try_from(inst.register() as u32).unwrap();
+            let size = if inst.is_address() { 3 } else { 2 };
+            let reg_val = il.reg(size, reg);
+            let shift_amount = il.const_int(size, count as u64);
+            let op = il.rrc(size, reg_val, shift_amount).with_flag_write(FlagWrite::All);
+            il.set_reg(size, reg, op).append();
         }
-        Instruction::Rram(_inst) => {
-            // TODO: Implement RRAM LLIL lifting (rotate right arithmetic multiple)
-            il.unimplemented().append();
+        Instruction::Rram(inst) => {
+            // Rotate right arithmetic multiple times (arithmetic shift right)
+            let count = inst.count();
+            let reg = Register::try_from(inst.register() as u32).unwrap();
+            let size = if inst.is_address() { 3 } else { 2 };
+            let reg_val = il.reg(size, reg);
+            let shift_amount = il.const_int(size, count as u64);
+            let op = il.asr(size, reg_val, shift_amount).with_flag_write(FlagWrite::Cnz);
+            il.set_reg(size, reg, op).append();
+            il.set_flag(Flag::V, il.const_int(0, 0)).append();
         }
-        Instruction::Rlam(_inst) => {
-            // TODO: Implement RLAM LLIL lifting (rotate left arithmetic multiple)
-            il.unimplemented().append();
+        Instruction::Rlam(inst) => {
+            // Rotate left arithmetic multiple times (logical shift left)
+            let count = inst.count();
+            let reg = Register::try_from(inst.register() as u32).unwrap();
+            let size = if inst.is_address() { 3 } else { 2 };
+            let reg_val = il.reg(size, reg);
+            let shift_amount = il.const_int(size, count as u64);
+            let op = il.lsl(size, reg_val, shift_amount).with_flag_write(FlagWrite::All);
+            il.set_reg(size, reg, op).append();
         }
-        Instruction::Rrum(_inst) => {
-            // TODO: Implement RRUM LLIL lifting (rotate right unsigned multiple)
-            il.unimplemented().append();
+        Instruction::Rrum(inst) => {
+            // Rotate right unsigned multiple times (logical shift right)
+            let count = inst.count();
+            let reg = Register::try_from(inst.register() as u32).unwrap();
+            let size = if inst.is_address() { 3 } else { 2 };
+            let reg_val = il.reg(size, reg);
+            let shift_amount = il.const_int(size, count as u64);
+            let op = il.lsr(size, reg_val, shift_amount).with_flag_write(FlagWrite::Cnz);
+            il.set_reg(size, reg, op).append();
+            il.set_flag(Flag::V, il.const_int(0, 0)).append();
         }
-        Instruction::Pushm(_inst) => {
-            // TODO: Implement PUSHM LLIL lifting (push multiple registers)
-            il.unimplemented().append();
+        Instruction::Pushm(inst) => {
+            // Push multiple registers to stack
+            let count = inst.count();
+            let end_reg = inst.register();
+            let size = if inst.is_address() { 3 } else { 2 };
+
+            // Push registers in descending order from end_reg to (end_reg - count + 1)
+            for i in 0..count {
+                let reg_num = end_reg.wrapping_sub(i);
+                if let Ok(reg) = Register::try_from(reg_num as u32) {
+                    il.push(size, il.reg(size, reg)).append();
+                }
+            }
         }
-        Instruction::Popm(_inst) => {
-            // TODO: Implement POPM LLIL lifting (pop multiple registers)
-            il.unimplemented().append();
+        Instruction::Popm(inst) => {
+            // Pop multiple registers from stack
+            let count = inst.count();
+            let end_reg = inst.register();
+            let size = if inst.is_address() { 3 } else { 2 };
+
+            // Pop registers in ascending order to (end_reg - count + 1) to end_reg
+            for i in (0..count).rev() {
+                let reg_num = end_reg.wrapping_sub(i);
+                if let Ok(reg) = Register::try_from(reg_num as u32) {
+                    il.set_reg(size, reg, il.pop(size)).append();
+                }
+            }
         }
     }
 }
@@ -776,5 +840,62 @@ fn width_to_size(width: &OperandWidth) -> usize {
         OperandWidth::Byte => 1,
         OperandWidth::Word => 2,
         OperandWidth::Address => 3, // 20-bit for MSP430X
+    }
+}
+
+// Helper function to write to MSP430X 20-bit address operands
+fn msp430x_address_write<'a>(
+    operand: &Operand,
+    il: &'a LowLevelILMutableFunction,
+    value: LowLevelILMutableExpression<'a, ValueExpr>,
+) {
+    match operand {
+        Operand::RegisterDirect(r) => {
+            il.set_reg(3, Register::try_from(*r as u32).unwrap(), value)
+                .append();
+        }
+        Operand::Indexed20((r, offset)) => {
+            il.store(
+                3,
+                il.add(
+                    3,
+                    il.reg(3, Register::try_from(*r as u32).unwrap()),
+                    il.const_int(3, *offset as u64),
+                ),
+                value,
+            )
+            .append();
+        }
+        Operand::Symbolic20(offset) => {
+            il.store(3, il.add(3, il.reg(3, Register::Pc), *offset as u64), value)
+                .append();
+        }
+        Operand::Absolute20(addr) => {
+            il.store(3, il.const_ptr(*addr as u64), value).append();
+        }
+        // 16-bit variants also supported for compatibility
+        Operand::Indexed((r, offset)) => {
+            il.store(
+                3,
+                il.add(
+                    3,
+                    il.reg(3, Register::try_from(*r as u32).unwrap()),
+                    il.const_int(3, *offset as u64),
+                ),
+                value,
+            )
+            .append();
+        }
+        Operand::Symbolic(offset) => {
+            il.store(3, il.add(3, il.reg(3, Register::Pc), *offset as u64), value)
+                .append();
+        }
+        Operand::Absolute(addr) => {
+            il.store(3, il.const_ptr(*addr as u64), value).append();
+        }
+        _ => {
+            // For other operand types, this shouldn't happen in address instructions
+            unreachable!("Unexpected operand type for MSP430X address write");
+        }
     }
 }

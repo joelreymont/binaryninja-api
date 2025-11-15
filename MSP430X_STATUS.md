@@ -59,17 +59,32 @@ Completed:
 Build status: Compiles successfully (linker error is environment-only, code compiles)
 Tests: All 18 decoder tests pass
 
+### Phase 4: LLIL Lifting (COMPLETE)
+
+**Commit**: (current)
+
+Completed:
+- Implemented MOVA LLIL lifting (20-bit move address)
+- Implemented CMPA LLIL lifting (20-bit compare with flag updates)
+- Implemented ADDA LLIL lifting (20-bit add with flag updates)
+- Implemented SUBA LLIL lifting (20-bit subtract with flag updates)
+- Implemented CALLA LLIL lifting (20-bit call)
+- Implemented RETA LLIL lifting (20-bit return via 3-byte pop)
+- Implemented RRCM LLIL lifting (rotate right through carry multiple)
+- Implemented RRAM LLIL lifting (arithmetic shift right multiple)
+- Implemented RLAM LLIL lifting (logical shift left multiple)
+- Implemented RRUM LLIL lifting (logical shift right multiple)
+- Implemented PUSHM LLIL lifting (push multiple registers)
+- Implemented POPM LLIL lifting (pop multiple registers)
+- Added msp430x_address_write helper function for 20-bit operand writes
+- All rotate instructions handle both .a (address/20-bit) and .w (word/16-bit) modes
+- All push/pop instructions handle both .a and .w modes
+
+Build status: Compiles successfully
+
 ---
 
 ## Remaining Work
-
-### Phase 4: LLIL Lifting
-
-Implement lifting for MSP430X instructions in `lift.rs`:
-- Address instructions (MOVA, CMPA, ADDA, SUBA)
-- Control flow (CALLA, RETA, BRA)
-- Rotate/shift multiple bits
-- PUSHM/POPM stack operations
 
 ### Phase 5: Testing
 
