@@ -322,4 +322,41 @@ mod tests {
         let data = [];
         assert_eq!(decode(&data), Err(DecodeError::MissingInstruction));
     }
+
+    // Additional MSP430X and base MSP430 tests for better coverage
+    #[test]
+    fn base_msp430_add() {
+        let data = [0x0E, 0x5F]; // add.w r14, r15
+        let inst = decode(&data);
+        assert!(inst.is_ok());
+    }
+
+    #[test]
+    fn base_msp430_sub() {
+        let data = [0x0E, 0x8F]; // sub.w r14, r15
+        let inst = decode(&data);
+        assert!(inst.is_ok());
+    }
+
+    #[test]
+    fn base_msp430_cmp() {
+        let data = [0x0E, 0x9F]; // cmp.w r14, r15
+        let inst = decode(&data);
+        assert!(inst.is_ok());
+    }
+
+    #[test]
+    fn decode_instruction_sizes() {
+        // JMP is 2 bytes
+        let data = [0x00, 0x3c];
+        if let Ok(inst) = decode(&data) {
+            assert_eq!(inst.size(), 2);
+        }
+
+        // RETA is 2 bytes
+        let data = [0x10, 0x01];
+        if let Ok(inst) = decode(&data) {
+            assert_eq!(inst.size(), 2);
+        }
+    }
 }
