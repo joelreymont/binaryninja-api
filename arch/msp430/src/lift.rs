@@ -4,12 +4,12 @@ use crate::register::Register;
 
 use binaryninja::{architecture::FlagCondition, low_level_il::lifting::LowLevelILLabel};
 
-use msp430_asm::emulate::Emulated;
-use msp430_asm::instruction::Instruction;
-use msp430_asm::jxx::Jxx;
-use msp430_asm::operand::{Operand, OperandWidth};
-use msp430_asm::single_operand::SingleOperand;
-use msp430_asm::two_operand::TwoOperand;
+use msp430_asm_extended::emulate::Emulated;
+use msp430_asm_extended::instruction::Instruction;
+use msp430_asm_extended::jxx::Jxx;
+use msp430_asm_extended::operand::{Operand, OperandWidth};
+use msp430_asm_extended::single_operand::SingleOperand;
+use msp430_asm_extended::two_operand::TwoOperand;
 
 use binaryninja::low_level_il::expression::ValueExpr;
 use binaryninja::low_level_il::{LowLevelILMutableExpression, LowLevelILMutableFunction};
@@ -49,11 +49,27 @@ macro_rules! one_operand {
                     $op,
                 )
                 .append(),
+            Operand::Indexed20((r, offset)) => $il
+                .store(
+                    3,
+                    $il.add(
+                        3,
+                        $il.reg(3, Register::try_from(*r as u32).unwrap()),
+                        $il.const_int(3, *offset as u64),
+                    ),
+                    $op,
+                )
+                .append(),
             Operand::Symbolic(offset) => $il
                 .store(2, $il.add(2, $il.reg(2, Register::Pc), *offset as u64), $op)
                 .append(),
+            Operand::Symbolic20(offset) => $il
+                .store(3, $il.add(3, $il.reg(3, Register::Pc), *offset as u64), $op)
+                .append(),
             Operand::Absolute(val) => $il.store(2, $il.const_ptr(*val as u64), $op).append(),
+            Operand::Absolute20(val) => $il.store(3, $il.const_ptr(*val as u64), $op).append(),
             Operand::Immediate(_) => $op.append(),
+            Operand::Immediate20(_) => $op.append(),
             Operand::RegisterIndirect(r) => $il
                 .store(2, $il.reg(2, Register::try_from(*r as u32).unwrap()), $op)
                 .append(),
@@ -93,10 +109,25 @@ macro_rules! two_operand {
                     $op,
                 )
                 .append(),
+            Operand::Indexed20((r, offset)) => $il
+                .store(
+                    3,
+                    $il.add(
+                        3,
+                        $il.reg(3, Register::try_from(*r as u32).unwrap()),
+                        $il.const_int(3, *offset as u64),
+                    ),
+                    $op,
+                )
+                .append(),
             Operand::Symbolic(offset) => $il
                 .store(2, $il.add(2, $il.reg(2, Register::Pc), *offset as u64), $op)
                 .append(),
+            Operand::Symbolic20(offset) => $il
+                .store(3, $il.add(3, $il.reg(3, Register::Pc), *offset as u64), $op)
+                .append(),
             Operand::Absolute(val) => $il.store(2, $il.const_ptr(*val as u64), $op).append(),
+            Operand::Absolute20(val) => $il.store(3, $il.const_ptr(*val as u64), $op).append(),
             _ => {
                 unreachable!()
             }
@@ -121,10 +152,25 @@ macro_rules! emulated {
                     $op,
                 )
                 .append(),
+            Some(Operand::Indexed20((r, offset))) => $il
+                .store(
+                    3,
+                    $il.add(
+                        3,
+                        $il.reg(3, Register::try_from(*r as u32).unwrap()),
+                        $il.const_int(3, *offset as u64),
+                    ),
+                    $op,
+                )
+                .append(),
             Some(Operand::Symbolic(offset)) => $il
                 .store(2, $il.add(2, $il.reg(2, Register::Pc), *offset as u64), $op)
                 .append(),
+            Some(Operand::Symbolic20(offset)) => $il
+                .store(3, $il.add(3, $il.reg(3, Register::Pc), *offset as u64), $op)
+                .append(),
             Some(Operand::Absolute(val)) => $il.store(2, $il.const_ptr(*val as u64), $op).append(),
+            Some(Operand::Absolute20(val)) => $il.store(3, $il.const_ptr(*val as u64), $op).append(),
             _ => {
                 unreachable!()
             }
@@ -176,7 +222,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                 Some(OperandWidth::Byte) => {
                     il.sx(2, il.rrc(size, dest, src).with_flag_write(FlagWrite::All))
                 }
-                Some(OperandWidth::Word) | None => {
+                Some(OperandWidth::Word) | Some(OperandWidth::Address) | None => {
                     il.rrc(size, dest, src).with_flag_write(FlagWrite::All)
                 }
             };
@@ -198,7 +244,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                 Some(OperandWidth::Byte) => {
                     il.sx(2, il.ror(size, dest, src).with_flag_write(FlagWrite::Cnz))
                 }
-                Some(OperandWidth::Word) | None => {
+                Some(OperandWidth::Word) | Some(OperandWidth::Address) | None => {
                     il.ror(size, dest, src).with_flag_write(FlagWrite::Cnz)
                 }
             };
@@ -294,7 +340,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                 OperandWidth::Byte => il
                     .sx(2, lift_source_operand(inst.source(), size, il))
                     .build(),
-                OperandWidth::Word => lift_source_operand(inst.source(), size, il),
+                OperandWidth::Word | OperandWidth::Address => lift_source_operand(inst.source(), size, il),
             };
             two_operand!(inst.destination(), il, src);
             auto_increment!(inst.source(), il);
@@ -307,7 +353,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                 OperandWidth::Byte => {
                     il.sx(2, il.add(size, src, dest).with_flag_write(FlagWrite::All))
                 }
-                OperandWidth::Word => il.add(size, src, dest).with_flag_write(FlagWrite::All),
+                OperandWidth::Word | OperandWidth::Address => il.add(size, src, dest).with_flag_write(FlagWrite::All),
             };
             two_operand!(inst.destination(), il, op);
             auto_increment!(inst.source(), il);
@@ -326,7 +372,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                 OperandWidth::Byte => {
                     il.sx(2, il.sub(size, src, dest).with_flag_write(FlagWrite::All))
                 }
-                OperandWidth::Word => il.sub(size, src, dest).with_flag_write(FlagWrite::All),
+                OperandWidth::Word | OperandWidth::Address => il.sub(size, src, dest).with_flag_write(FlagWrite::All),
             };
             two_operand!(inst.destination(), il, op);
             auto_increment!(inst.source(), il);
@@ -360,7 +406,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
             let dest = lift_source_operand(inst.destination(), size, il);
             let op = match inst.operand_width() {
                 OperandWidth::Byte => il.sx(2, il.and(size, il.not(size, src), dest)),
-                OperandWidth::Word => il.and(size, il.not(size, src), dest),
+                OperandWidth::Word | OperandWidth::Address => il.and(size, il.not(size, src), dest),
             };
             two_operand!(inst.destination(), il, op);
             auto_increment!(inst.source(), il);
@@ -371,7 +417,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
             let dest = lift_source_operand(inst.destination(), size, il);
             let op = match inst.operand_width() {
                 OperandWidth::Byte => il.sx(2, il.or(size, src, dest)),
-                OperandWidth::Word => il.or(size, src, dest),
+                OperandWidth::Word | OperandWidth::Address => il.or(size, src, dest),
             };
             two_operand!(inst.destination(), il, op);
             auto_increment!(inst.source(), il);
@@ -384,7 +430,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                 OperandWidth::Byte => {
                     il.sx(2, il.xor(size, src, dest).with_flag_write(FlagWrite::Nvz))
                 }
-                OperandWidth::Word => il.xor(size, src, dest).with_flag_write(FlagWrite::Nvz),
+                OperandWidth::Word | OperandWidth::Address => il.xor(size, src, dest).with_flag_write(FlagWrite::Nvz),
             };
             two_operand!(inst.destination(), il, op);
             il.set_flag(Flag::C, il.not(0, il.flag(Flag::Z))).append();
@@ -398,7 +444,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                 OperandWidth::Byte => {
                     il.sx(2, il.and(size, src, dest).with_flag_write(FlagWrite::Nz))
                 }
-                OperandWidth::Word => il.and(size, src, dest).with_flag_write(FlagWrite::Nz),
+                OperandWidth::Word | OperandWidth::Address => il.and(size, src, dest).with_flag_write(FlagWrite::Nz),
             };
             two_operand!(inst.destination(), il, op);
             il.set_flag(Flag::V, il.const_int(0, 0)).append();
@@ -455,7 +501,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                     il.sub(size, dest, il.const_int(size, 1))
                         .with_flag_write(FlagWrite::All),
                 ),
-                Some(OperandWidth::Word) | None => il
+                Some(OperandWidth::Word) | Some(OperandWidth::Address) | None => il
                     .sub(size, dest, il.const_int(size, 1))
                     .with_flag_write(FlagWrite::All),
             };
@@ -473,7 +519,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                     il.sub(size, dest, il.const_int(size, 2))
                         .with_flag_write(FlagWrite::All),
                 ),
-                Some(OperandWidth::Word) | None => il
+                Some(OperandWidth::Word) | Some(OperandWidth::Address) | None => il
                     .sub(size, dest, il.const_int(size, 2))
                     .with_flag_write(FlagWrite::All),
             };
@@ -497,7 +543,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                     il.add(size, dest, il.const_int(size, 1))
                         .with_flag_write(FlagWrite::All),
                 ),
-                Some(OperandWidth::Word) | None => il
+                Some(OperandWidth::Word) | Some(OperandWidth::Address) | None => il
                     .add(size, dest, il.const_int(size, 1))
                     .with_flag_write(FlagWrite::All),
             };
@@ -515,7 +561,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                     il.add(size, dest, il.const_int(size, 2))
                         .with_flag_write(FlagWrite::All),
                 ),
-                Some(OperandWidth::Word) | None => il
+                Some(OperandWidth::Word) | Some(OperandWidth::Address) | None => il
                     .add(size, dest, il.const_int(size, 2))
                     .with_flag_write(FlagWrite::All),
             };
@@ -531,7 +577,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                 Some(OperandWidth::Byte) => {
                     il.sx(2, il.not(size, dest).with_flag_write(FlagWrite::Nvz))
                 }
-                Some(OperandWidth::Word) | None => {
+                Some(OperandWidth::Word) | Some(OperandWidth::Address) | None => {
                     il.not(size, dest).with_flag_write(FlagWrite::Nvz)
                 }
             };
@@ -567,7 +613,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                 Some(OperandWidth::Byte) => {
                     il.sx(2, il.rol(size, dest, src).with_flag_write(FlagWrite::All))
                 }
-                Some(OperandWidth::Word) | None => {
+                Some(OperandWidth::Word) | Some(OperandWidth::Address) | None => {
                     il.rol(size, dest, src).with_flag_write(FlagWrite::All)
                 }
             };
@@ -584,7 +630,7 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                 Some(OperandWidth::Byte) => {
                     il.sx(2, il.rlc(size, dest, src).with_flag_write(FlagWrite::All))
                 }
-                Some(OperandWidth::Word) | None => {
+                Some(OperandWidth::Word) | Some(OperandWidth::Address) | None => {
                     il.rlc(size, dest, src).with_flag_write(FlagWrite::All)
                 }
             };
@@ -617,6 +663,55 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
             il.set_flag(Flag::V, il.const_int(0, 0)).append();
             il.set_flag(Flag::C, il.const_int(0, 1)).append();
         }
+        // MSP430X extended instructions - Phase 4 LLIL lifting not yet implemented
+        Instruction::Mova(_inst) => {
+            // TODO: Implement MOVA LLIL lifting (20-bit move address)
+            il.unimplemented().append();
+        }
+        Instruction::Cmpa(_inst) => {
+            // TODO: Implement CMPA LLIL lifting (20-bit compare address)
+            il.unimplemented().append();
+        }
+        Instruction::Adda(_inst) => {
+            // TODO: Implement ADDA LLIL lifting (20-bit add address)
+            il.unimplemented().append();
+        }
+        Instruction::Suba(_inst) => {
+            // TODO: Implement SUBA LLIL lifting (20-bit subtract address)
+            il.unimplemented().append();
+        }
+        Instruction::Calla(_inst) => {
+            // TODO: Implement CALLA LLIL lifting (20-bit call)
+            il.unimplemented().append();
+        }
+        Instruction::Reta(_inst) => {
+            // TODO: Implement RETA LLIL lifting (20-bit return)
+            il.unimplemented().append();
+        }
+        Instruction::Rrcm(_inst) => {
+            // TODO: Implement RRCM LLIL lifting (rotate right through carry multiple)
+            il.unimplemented().append();
+        }
+        Instruction::Rram(_inst) => {
+            // TODO: Implement RRAM LLIL lifting (rotate right arithmetic multiple)
+            il.unimplemented().append();
+        }
+        Instruction::Rlam(_inst) => {
+            // TODO: Implement RLAM LLIL lifting (rotate left arithmetic multiple)
+            il.unimplemented().append();
+        }
+        Instruction::Rrum(_inst) => {
+            // TODO: Implement RRUM LLIL lifting (rotate right unsigned multiple)
+            il.unimplemented().append();
+        }
+        Instruction::Pushm(_inst) => {
+            // TODO: Implement PUSHM LLIL lifting (push multiple registers)
+            il.unimplemented().append();
+        }
+        Instruction::Popm(_inst) => {
+            // TODO: Implement POPM LLIL lifting (pop multiple registers)
+            il.unimplemented().append();
+        }
     }
 }
 
@@ -637,6 +732,17 @@ fn lift_source_operand<'a>(
                 ),
             )
             .build(),
+        // MSP430X 20-bit indexed addressing
+        Operand::Indexed20((r, offset)) => il
+            .load(
+                size,
+                il.add(
+                    3,
+                    il.reg(3, Register::try_from(*r as u32).unwrap()),
+                    il.const_int(3, *offset as u64),
+                ),
+            )
+            .build(),
         // should we add offset to addr here rather than lifting to the register since we know where PC is?
         Operand::Symbolic(offset) => il
             .load(
@@ -644,12 +750,23 @@ fn lift_source_operand<'a>(
                 il.add(2, il.reg(2, Register::Pc), il.const_int(2, *offset as u64)),
             )
             .build(),
+        // MSP430X 20-bit symbolic addressing
+        Operand::Symbolic20(offset) => il
+            .load(
+                size,
+                il.add(3, il.reg(3, Register::Pc), il.const_int(3, *offset as u64)),
+            )
+            .build(),
         Operand::Absolute(addr) => il.load(size, il.const_ptr(*addr as u64)).build(),
+        // MSP430X 20-bit absolute addressing
+        Operand::Absolute20(addr) => il.load(size, il.const_ptr(*addr as u64)).build(),
         // these are the same, we need to autoincrement in a separate il instruction
         Operand::RegisterIndirect(r) | Operand::RegisterIndirectAutoIncrement(r) => il
             .load(size, il.reg(2, Register::try_from(*r as u32).unwrap()))
             .build(),
         Operand::Immediate(val) => il.const_int(size, *val as u64),
+        // MSP430X 20-bit immediate
+        Operand::Immediate20(val) => il.const_int(size, *val as u64),
         Operand::Constant(val) => il.const_int(size, *val as u64),
     }
 }
@@ -658,5 +775,6 @@ fn width_to_size(width: &OperandWidth) -> usize {
     match width {
         OperandWidth::Byte => 1,
         OperandWidth::Word => 2,
+        OperandWidth::Address => 3, // 20-bit for MSP430X
     }
 }

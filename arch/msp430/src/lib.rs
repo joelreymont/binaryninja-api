@@ -1,6 +1,5 @@
 extern crate binaryninja;
 extern crate log;
-extern crate msp430_asm;
 
 use binaryninja::{
     add_optional_plugin_dependency,

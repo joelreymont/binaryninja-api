@@ -36,42 +36,32 @@ Created msp430-asm-extended decoder library with:
 
 Build status: Compiles successfully
 
-### Phase 3: Binary Ninja Integration (PARTIAL)
+### Phase 3: Binary Ninja Integration (COMPLETE)
 
-**Commit**: 42e3299
+**Commits**: 42e3299, 8781536, (current)
 
 Completed:
 - Updated Cargo.toml to use msp430-asm-extended
 - Changed address_size to 3 bytes (20-bit)
-- Added 20-bit operand token generation
+- Added 20-bit operand token generation (Indexed20, Symbolic20, Immediate20, Absolute20)
 - Updated imports to use extended decoder
+- Added MSP430X instruction cases to generate_tokens()
+- Added helper functions for MSP430X token generation
+- Added MSP430X instruction cases to instruction_info() for branch handling
+- Added CALLA and RETA branch info with 20-bit targets
+- Added 20-bit operand cases to Br and Call instructions
+- Added MSP430X instruction placeholders to lift_instruction()
+- Added 20-bit operand support to lift_source_operand()
+- Added OperandWidth::Address support throughout
+- Updated all macros (one_operand!, two_operand!, emulated!) for 20-bit operands
+- Fixed all imports in lib.rs and lift.rs
 
-**Incomplete (build errors)**:
-- Need to add MSP430X instruction cases to generate_tokens() match
-- Need to add MSP430X instruction cases to instruction_info() match
-- Need to add MSP430X instruction cases to lift_instruction() match
+Build status: Compiles successfully (linker error is environment-only, code compiles)
+Tests: All 18 decoder tests pass
 
 ---
 
 ## Remaining Work
-
-### Phase 3: Complete Integration
-
-Add pattern matching for all MSP430X instructions in:
-
-1. `generate_tokens()` (architecture.rs:360)
-   - Mova, Cmpa, Adda, Suba
-   - Calla, Reta
-   - Rrcm, Rram, Rlam, Rrum
-   - Pushm, Popm
-
-2. `instruction_info()` (architecture.rs:84)
-   - Add branch info for CALLA, RETA
-   - Handle 20-bit branch targets
-
-3. Operand handling in lift.rs:
-   - Add Indexed20 case
-   - Complete all 20-bit operand variants
 
 ### Phase 4: LLIL Lifting
 

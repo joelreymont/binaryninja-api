@@ -122,14 +122,25 @@ impl Architecture for Msp430 {
                     }
                     Instruction::Br(inst) => match inst.destination() {
                         Some(Operand::RegisterDirect(_)) => info.add_branch(BranchKind::Indirect),
-                        Some(Operand::Indexed(_)) => info.add_branch(BranchKind::Indirect),
+                        Some(Operand::Indexed(_)) | Some(Operand::Indexed20(_)) => {
+                            info.add_branch(BranchKind::Indirect)
+                        }
                         Some(Operand::Absolute(value)) => {
+                            info.add_branch(BranchKind::Unconditional(*value as u64))
+                        }
+                        Some(Operand::Absolute20(value)) => {
                             info.add_branch(BranchKind::Unconditional(*value as u64))
                         }
                         Some(Operand::Symbolic(offset)) => info.add_branch(
                             BranchKind::Unconditional((addr as i64 + *offset as i64) as u64),
                         ),
+                        Some(Operand::Symbolic20(offset)) => info.add_branch(
+                            BranchKind::Unconditional((addr as i64 + *offset as i64) as u64),
+                        ),
                         Some(Operand::Immediate(addr)) => {
+                            info.add_branch(BranchKind::Unconditional(*addr as u64))
+                        }
+                        Some(Operand::Immediate20(addr)) => {
                             info.add_branch(BranchKind::Unconditional(*addr as u64))
                         }
                         Some(Operand::Constant(_)) => {
@@ -143,14 +154,25 @@ impl Architecture for Msp430 {
                     },
                     Instruction::Call(inst) => match inst.source() {
                         Operand::RegisterDirect(_) => info.add_branch(BranchKind::Indirect),
-                        Operand::Indexed(_) => info.add_branch(BranchKind::Indirect),
+                        Operand::Indexed(_) | Operand::Indexed20(_) => {
+                            info.add_branch(BranchKind::Indirect)
+                        }
                         Operand::Absolute(value) => {
+                            info.add_branch(BranchKind::Call(*value as u64))
+                        }
+                        Operand::Absolute20(value) => {
                             info.add_branch(BranchKind::Call(*value as u64))
                         }
                         Operand::Symbolic(offset) => {
                             info.add_branch(BranchKind::Call((addr as i64 + *offset as i64) as u64))
                         }
+                        Operand::Symbolic20(offset) => {
+                            info.add_branch(BranchKind::Call((addr as i64 + *offset as i64) as u64))
+                        }
                         Operand::Immediate(addr) => info.add_branch(BranchKind::Call(*addr as u64)),
+                        Operand::Immediate20(addr) => {
+                            info.add_branch(BranchKind::Call(*addr as u64))
+                        }
                         Operand::Constant(_) => info.add_branch(BranchKind::Call(addr)),
                         Operand::RegisterIndirect(_)
                         | Operand::RegisterIndirectAutoIncrement(_) => {
@@ -163,6 +185,48 @@ impl Architecture for Msp430 {
                     Instruction::Ret(_) => {
                         info.add_branch(BranchKind::FunctionReturn);
                     }
+                    // MSP430X extended instructions
+                    Instruction::Calla(inst) => match inst.destination() {
+                        Operand::RegisterDirect(_) => info.add_branch(BranchKind::Indirect),
+                        Operand::Indexed(_) | Operand::Indexed20(_) => {
+                            info.add_branch(BranchKind::Indirect)
+                        }
+                        Operand::Absolute(value) => {
+                            info.add_branch(BranchKind::Call(*value as u64))
+                        }
+                        Operand::Absolute20(value) => {
+                            info.add_branch(BranchKind::Call(*value as u64))
+                        }
+                        Operand::Symbolic(offset) => {
+                            info.add_branch(BranchKind::Call((addr as i64 + *offset as i64) as u64))
+                        }
+                        Operand::Symbolic20(offset) => {
+                            info.add_branch(BranchKind::Call((addr as i64 + *offset as i64) as u64))
+                        }
+                        Operand::Immediate(addr) => info.add_branch(BranchKind::Call(*addr as u64)),
+                        Operand::Immediate20(addr) => {
+                            info.add_branch(BranchKind::Call(*addr as u64))
+                        }
+                        Operand::Constant(_) => info.add_branch(BranchKind::Call(addr)),
+                        Operand::RegisterIndirect(_)
+                        | Operand::RegisterIndirectAutoIncrement(_) => {
+                            info.add_branch(BranchKind::Indirect)
+                        }
+                    },
+                    Instruction::Reta(_) => {
+                        info.add_branch(BranchKind::FunctionReturn);
+                    }
+                    // Other MSP430X instructions (no branch info needed)
+                    Instruction::Mova(_)
+                    | Instruction::Cmpa(_)
+                    | Instruction::Adda(_)
+                    | Instruction::Suba(_)
+                    | Instruction::Rrcm(_)
+                    | Instruction::Rram(_)
+                    | Instruction::Rlam(_)
+                    | Instruction::Rrum(_)
+                    | Instruction::Pushm(_)
+                    | Instruction::Popm(_) => {}
                     _ => {}
                 }
 
@@ -418,6 +482,23 @@ fn generate_tokens(inst: &Instruction, addr: u64) -> Vec<InstructionTextToken> {
         Instruction::Setn(inst) => generate_emulated_tokens(inst, addr, false),
         Instruction::Setz(inst) => generate_emulated_tokens(inst, addr, false),
         Instruction::Tst(inst) => generate_emulated_tokens(inst, addr, false),
+
+        // MSP430X extended instructions
+        Instruction::Mova(inst) => generate_msp430x_address_tokens(inst, addr),
+        Instruction::Cmpa(inst) => generate_msp430x_address_tokens(inst, addr),
+        Instruction::Adda(inst) => generate_msp430x_address_tokens(inst, addr),
+        Instruction::Suba(inst) => generate_msp430x_address_tokens(inst, addr),
+        Instruction::Calla(inst) => generate_msp430x_calla_tokens(inst, addr),
+        Instruction::Reta(_) => vec![InstructionTextToken::new(
+            "reta",
+            InstructionTextTokenKind::Instruction,
+        )],
+        Instruction::Rrcm(inst) => generate_msp430x_rotate_tokens(inst),
+        Instruction::Rram(inst) => generate_msp430x_rotate_tokens(inst),
+        Instruction::Rlam(inst) => generate_msp430x_rotate_tokens(inst),
+        Instruction::Rrum(inst) => generate_msp430x_rotate_tokens(inst),
+        Instruction::Pushm(inst) => generate_msp430x_pushpop_tokens(inst),
+        Instruction::Popm(inst) => generate_msp430x_pushpop_tokens(inst),
     }
 }
 
@@ -804,4 +885,130 @@ fn generate_operand_tokens(source: &Operand, addr: u64, call: bool) -> Vec<Instr
 pub(crate) fn offset_to_absolute(addr: u64, offset: i16) -> u64 {
     // add + 2 to addr to get past the jxx instruction which is always 2 bytes
     ((addr + 2) as i64 + ((offset * 2) as i64)) as u64
+}
+
+// MSP430X token generation helpers
+fn generate_msp430x_address_tokens(
+    inst: &msp430_asm_extended::msp430x_instructions::AddressInstruction,
+    addr: u64,
+) -> Vec<InstructionTextToken> {
+    let mut res = vec![InstructionTextToken::new(
+        inst.mnemonic(),
+        InstructionTextTokenKind::Instruction,
+    )];
+
+    if inst.mnemonic().len() < MIN_MNEMONIC {
+        let padding = " ".repeat(MIN_MNEMONIC - inst.mnemonic().len());
+        res.push(InstructionTextToken::new(
+            padding,
+            InstructionTextTokenKind::Text,
+        ));
+    }
+
+    res.extend_from_slice(&generate_operand_tokens(inst.source(), addr, false));
+    res.push(InstructionTextToken::new(
+        ", ",
+        InstructionTextTokenKind::OperandSeparator,
+    ));
+    res.extend_from_slice(&generate_operand_tokens(inst.destination(), addr, false));
+
+    res
+}
+
+fn generate_msp430x_calla_tokens(
+    inst: &msp430_asm_extended::msp430x_instructions::Calla,
+    addr: u64,
+) -> Vec<InstructionTextToken> {
+    let mut res = vec![InstructionTextToken::new(
+        "calla",
+        InstructionTextTokenKind::Instruction,
+    )];
+
+    if "calla".len() < MIN_MNEMONIC {
+        let padding = " ".repeat(MIN_MNEMONIC - "calla".len());
+        res.push(InstructionTextToken::new(
+            padding,
+            InstructionTextTokenKind::Text,
+        ));
+    }
+
+    res.extend_from_slice(&generate_operand_tokens(inst.destination(), addr, true));
+
+    res
+}
+
+fn generate_msp430x_rotate_tokens(
+    inst: &msp430_asm_extended::msp430x_instructions::RotateMultiple,
+) -> Vec<InstructionTextToken> {
+    let suffix = if inst.is_address() { ".a" } else { ".w" };
+    let mnemonic = format!("{}{}", inst.mnemonic(), suffix);
+
+    let mut res = vec![InstructionTextToken::new(
+        mnemonic.clone(),
+        InstructionTextTokenKind::Instruction,
+    )];
+
+    if mnemonic.len() < MIN_MNEMONIC {
+        let padding = " ".repeat(MIN_MNEMONIC - mnemonic.len());
+        res.push(InstructionTextToken::new(
+            padding,
+            InstructionTextTokenKind::Text,
+        ));
+    }
+
+    res.push(InstructionTextToken::new(
+        format!("#{}", inst.count()),
+        InstructionTextTokenKind::Integer {
+            value: inst.count() as u64,
+            size: None,
+        },
+    ));
+    res.push(InstructionTextToken::new(
+        ", ",
+        InstructionTextTokenKind::OperandSeparator,
+    ));
+    res.push(InstructionTextToken::new(
+        format!("r{}", inst.register()),
+        InstructionTextTokenKind::Register,
+    ));
+
+    res
+}
+
+fn generate_msp430x_pushpop_tokens(
+    inst: &msp430_asm_extended::msp430x_instructions::PushPopMultiple,
+) -> Vec<InstructionTextToken> {
+    let suffix = if inst.is_address() { ".a" } else { ".w" };
+    let mnemonic = format!("{}{}", inst.mnemonic(), suffix);
+
+    let mut res = vec![InstructionTextToken::new(
+        mnemonic.clone(),
+        InstructionTextTokenKind::Instruction,
+    )];
+
+    if mnemonic.len() < MIN_MNEMONIC {
+        let padding = " ".repeat(MIN_MNEMONIC - mnemonic.len());
+        res.push(InstructionTextToken::new(
+            padding,
+            InstructionTextTokenKind::Text,
+        ));
+    }
+
+    res.push(InstructionTextToken::new(
+        format!("#{}", inst.count()),
+        InstructionTextTokenKind::Integer {
+            value: inst.count() as u64,
+            size: None,
+        },
+    ));
+    res.push(InstructionTextToken::new(
+        ", ",
+        InstructionTextTokenKind::OperandSeparator,
+    ));
+    res.push(InstructionTextToken::new(
+        format!("r{}", inst.register()),
+        InstructionTextTokenKind::Register,
+    ));
+
+    res
 }
