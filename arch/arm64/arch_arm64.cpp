@@ -1079,6 +1079,54 @@ class Arm64Architecture : public Architecture
 			return "__subp";
 		case ARM64_INTRIN_SUBPS:
 			return "__subps";
+		case ARM64_INTRIN_LDSMAX:
+			return "__ldsmax";
+		case ARM64_INTRIN_LDSMAXB:
+			return "__ldsmaxb";
+		case ARM64_INTRIN_LDSMAXH:
+			return "__ldsmaxh";
+		case ARM64_INTRIN_LDSMIN:
+			return "__ldsmin";
+		case ARM64_INTRIN_LDSMINB:
+			return "__ldsminb";
+		case ARM64_INTRIN_LDSMINH:
+			return "__ldsminh";
+		case ARM64_INTRIN_LDUMAX:
+			return "__ldumax";
+		case ARM64_INTRIN_LDUMAXB:
+			return "__ldumaxb";
+		case ARM64_INTRIN_LDUMAXH:
+			return "__ldumaxh";
+		case ARM64_INTRIN_LDUMIN:
+			return "__ldumin";
+		case ARM64_INTRIN_LDUMINB:
+			return "__lduminb";
+		case ARM64_INTRIN_LDUMINH:
+			return "__lduminh";
+		case ARM64_INTRIN_STSMAX:
+			return "__stsmax";
+		case ARM64_INTRIN_STSMAXB:
+			return "__stsmaxb";
+		case ARM64_INTRIN_STSMAXH:
+			return "__stsmaxh";
+		case ARM64_INTRIN_STSMIN:
+			return "__stsmin";
+		case ARM64_INTRIN_STSMINB:
+			return "__stsminb";
+		case ARM64_INTRIN_STSMINH:
+			return "__stsminh";
+		case ARM64_INTRIN_STUMAX:
+			return "__stumax";
+		case ARM64_INTRIN_STUMAXB:
+			return "__stumaxb";
+		case ARM64_INTRIN_STUMAXH:
+			return "__stumaxh";
+		case ARM64_INTRIN_STUMIN:
+			return "__stumin";
+		case ARM64_INTRIN_STUMINB:
+			return "__stuminb";
+		case ARM64_INTRIN_STUMINH:
+			return "__stuminh";
 		default:
 			break;
 		}

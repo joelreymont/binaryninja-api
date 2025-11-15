@@ -2689,6 +2689,150 @@ bool GetLowLevelILForInstruction(
 		il.AddInstruction(il.Store(2, ILREG_O(operand2),
 		    il.Or(2, il.LowPart(2, ILREG_O(operand1)), il.Load(2, ILREG_O(operand2)))));
 		break;
+	case ARM64_LDSMAX:
+	case ARM64_LDSMAXA:
+	case ARM64_LDSMAXL:
+	case ARM64_LDSMAXAL:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_O(operand1))}, ARM64_INTRIN_LDSMAX,
+			{ILREG_O(operand2), ILREG_O(operand3)}));
+		break;
+	case ARM64_LDSMAXB:
+	case ARM64_LDSMAXAB:
+	case ARM64_LDSMAXLB:
+	case ARM64_LDSMAXALB:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_O(operand1))}, ARM64_INTRIN_LDSMAXB,
+			{ILREG_O(operand2), ILREG_O(operand3)}));
+		break;
+	case ARM64_LDSMAXH:
+	case ARM64_LDSMAXAH:
+	case ARM64_LDSMAXLH:
+	case ARM64_LDSMAXALH:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_O(operand1))}, ARM64_INTRIN_LDSMAXH,
+			{ILREG_O(operand2), ILREG_O(operand3)}));
+		break;
+	case ARM64_STSMAX:
+	case ARM64_STSMAXL:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_STSMAX,
+			{ILREG_O(operand1), ILREG_O(operand2)}));
+		break;
+	case ARM64_STSMAXB:
+	case ARM64_STSMAXLB:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_STSMAXB,
+			{ILREG_O(operand1), ILREG_O(operand2)}));
+		break;
+	case ARM64_STSMAXH:
+	case ARM64_STSMAXLH:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_STSMAXH,
+			{ILREG_O(operand1), ILREG_O(operand2)}));
+		break;
+	case ARM64_LDSMIN:
+	case ARM64_LDSMINA:
+	case ARM64_LDSMINL:
+	case ARM64_LDSMINAL:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_O(operand1))}, ARM64_INTRIN_LDSMIN,
+			{ILREG_O(operand2), ILREG_O(operand3)}));
+		break;
+	case ARM64_LDSMINB:
+	case ARM64_LDSMINAB:
+	case ARM64_LDSMINLB:
+	case ARM64_LDSMINALB:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_O(operand1))}, ARM64_INTRIN_LDSMINB,
+			{ILREG_O(operand2), ILREG_O(operand3)}));
+		break;
+	case ARM64_LDSMINH:
+	case ARM64_LDSMINAH:
+	case ARM64_LDSMINLH:
+	case ARM64_LDSMINALH:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_O(operand1))}, ARM64_INTRIN_LDSMINH,
+			{ILREG_O(operand2), ILREG_O(operand3)}));
+		break;
+	case ARM64_STSMIN:
+	case ARM64_STSMINL:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_STSMIN,
+			{ILREG_O(operand1), ILREG_O(operand2)}));
+		break;
+	case ARM64_STSMINB:
+	case ARM64_STSMINLB:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_STSMINB,
+			{ILREG_O(operand1), ILREG_O(operand2)}));
+		break;
+	case ARM64_STSMINH:
+	case ARM64_STSMINLH:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_STSMINH,
+			{ILREG_O(operand1), ILREG_O(operand2)}));
+		break;
+	case ARM64_LDUMAX:
+	case ARM64_LDUMAXA:
+	case ARM64_LDUMAXL:
+	case ARM64_LDUMAXAL:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_O(operand1))}, ARM64_INTRIN_LDUMAX,
+			{ILREG_O(operand2), ILREG_O(operand3)}));
+		break;
+	case ARM64_LDUMAXB:
+	case ARM64_LDUMAXAB:
+	case ARM64_LDUMAXLB:
+	case ARM64_LDUMAXALB:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_O(operand1))}, ARM64_INTRIN_LDUMAXB,
+			{ILREG_O(operand2), ILREG_O(operand3)}));
+		break;
+	case ARM64_LDUMAXH:
+	case ARM64_LDUMAXAH:
+	case ARM64_LDUMAXLH:
+	case ARM64_LDUMAXALH:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_O(operand1))}, ARM64_INTRIN_LDUMAXH,
+			{ILREG_O(operand2), ILREG_O(operand3)}));
+		break;
+	case ARM64_STUMAX:
+	case ARM64_STUMAXL:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_STUMAX,
+			{ILREG_O(operand1), ILREG_O(operand2)}));
+		break;
+	case ARM64_STUMAXB:
+	case ARM64_STUMAXLB:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_STUMAXB,
+			{ILREG_O(operand1), ILREG_O(operand2)}));
+		break;
+	case ARM64_STUMAXH:
+	case ARM64_STUMAXLH:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_STUMAXH,
+			{ILREG_O(operand1), ILREG_O(operand2)}));
+		break;
+	case ARM64_LDUMIN:
+	case ARM64_LDUMINA:
+	case ARM64_LDUMINL:
+	case ARM64_LDUMINAL:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_O(operand1))}, ARM64_INTRIN_LDUMIN,
+			{ILREG_O(operand2), ILREG_O(operand3)}));
+		break;
+	case ARM64_LDUMINB:
+	case ARM64_LDUMINAB:
+	case ARM64_LDUMINLB:
+	case ARM64_LDUMINALB:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_O(operand1))}, ARM64_INTRIN_LDUMINB,
+			{ILREG_O(operand2), ILREG_O(operand3)}));
+		break;
+	case ARM64_LDUMINH:
+	case ARM64_LDUMINAH:
+	case ARM64_LDUMINLH:
+	case ARM64_LDUMINALH:
+		il.AddInstruction(il.Intrinsic({RegisterOrFlag::Register(REG_O(operand1))}, ARM64_INTRIN_LDUMINH,
+			{ILREG_O(operand2), ILREG_O(operand3)}));
+		break;
+	case ARM64_STUMIN:
+	case ARM64_STUMINL:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_STUMIN,
+			{ILREG_O(operand1), ILREG_O(operand2)}));
+		break;
+	case ARM64_STUMINB:
+	case ARM64_STUMINLB:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_STUMINB,
+			{ILREG_O(operand1), ILREG_O(operand2)}));
+		break;
+	case ARM64_STUMINH:
+	case ARM64_STUMINLH:
+		il.AddInstruction(il.Intrinsic({}, ARM64_INTRIN_STUMINH,
+			{ILREG_O(operand1), ILREG_O(operand2)}));
+		break;
 	case ARM64_LSL:
 		il.AddInstruction(ILSETREG_O(operand1, il.ShiftLeft(REGSZ_O(operand2), ILREG_O(operand2),
 		                                           ReadILOperand(il, operand3, REGSZ_O(operand2)))));
