@@ -8,6 +8,5 @@ license = "MIT"
 homepage = "https://www.github.com/jrozner/msp430-asm"
 repository = "https://www.github.com/Vector35/binaryninja-api"
 
-[workspace]
 
 [dependencies]

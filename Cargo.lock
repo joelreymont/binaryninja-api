@@ -135,7 +135,7 @@ dependencies = [
  "binaryninja",
  "binaryninjacore-sys",
  "log",
- "msp430-asm",
+ "msp430-asm-extended",
 ]
 
 [[package]]
@@ -1409,10 +1409,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "msp430-asm"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e91c22f111c205b788cc10e2a58aed039d5dd5554d3a9236be3d413a912ff3cb"
+name = "msp430-asm-extended"
+version = "0.4.0"
 
 [[package]]
 name = "nix"

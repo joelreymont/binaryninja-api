@@ -11,7 +11,7 @@ use binaryninja::{
     Endianness,
 };
 
-use msp430_asm::{
+use msp430_asm_extended::{
     emulate::Emulated, instruction::Instruction, jxx::Jxx, operand::Operand,
     single_operand::SingleOperand, two_operand::TwoOperand,
 };
@@ -57,7 +57,7 @@ impl Architecture for Msp430 {
     }
 
     fn address_size(&self) -> usize {
-        2 // 16 bit
+        3 // 20 bit for MSP430X (was 2 for base MSP430)
     }
 
     fn default_integer_size(&self) -> usize {
@@ -81,7 +81,7 @@ impl Architecture for Msp430 {
     }
 
     fn instruction_info(&self, data: &[u8], addr: u64) -> Option<InstructionInfo> {
-        match msp430_asm::decode(data) {
+        match msp430_asm_extended::decode(data) {
             Ok(inst) => {
                 let mut info = InstructionInfo::new(inst.size(), 0);
 
@@ -177,7 +177,7 @@ impl Architecture for Msp430 {
         data: &[u8],
         addr: u64,
     ) -> Option<(usize, Vec<InstructionTextToken>)> {
-        match msp430_asm::decode(data) {
+        match msp430_asm_extended::decode(data) {
             Ok(inst) => {
                 let tokens = generate_tokens(&inst, addr);
                 if tokens.is_empty() {
@@ -196,7 +196,7 @@ impl Architecture for Msp430 {
         addr: u64,
         il: &LowLevelILMutableFunction,
     ) -> Option<(usize, bool)> {
-        match msp430_asm::decode(data) {
+        match msp430_asm_extended::decode(data) {
             Ok(inst) => {
                 lift_instruction(&inst, addr, il);
                 Some((inst.size(), true))
@@ -732,6 +732,71 @@ fn generate_operand_tokens(source: &Operand, addr: u64, call: bool) -> Vec<Instr
                     },
                 ),
             ]
+        }
+        // MSP430X 20-bit operands
+        Operand::Indexed20((r, i)) => {
+            let num_text = if *i >= 0 {
+                format!("{i:#x}")
+            } else {
+                format!("-{:#x}", -i)
+            };
+            vec![
+                InstructionTextToken::new(
+                    &num_text,
+                    InstructionTextTokenKind::Integer {
+                        value: *i as u64,
+                        size: None,
+                    },
+                ),
+                InstructionTextToken::new("(", InstructionTextTokenKind::Text),
+                InstructionTextToken::new(format!("r{r}"), InstructionTextTokenKind::Register),
+                InstructionTextToken::new(")", InstructionTextTokenKind::Text),
+            ]
+        }
+        Operand::Symbolic20(i) => {
+            let value = (addr as i64 + *i as i64) as u64;
+            vec![InstructionTextToken::new(
+                format!("{value:#x}"),
+                InstructionTextTokenKind::CodeRelativeAddress { value, size: None },
+            )]
+        }
+        Operand::Immediate20(i) => {
+            if call {
+                vec![InstructionTextToken::new(
+                    format!("{i:#x}"),
+                    InstructionTextTokenKind::CodeRelativeAddress {
+                        value: *i as u64,
+                        size: None,
+                    },
+                )]
+            } else {
+                vec![InstructionTextToken::new(
+                    format!("{i:#x}"),
+                    InstructionTextTokenKind::PossibleAddress {
+                        value: *i as u64,
+                        size: None,
+                    },
+                )]
+            }
+        }
+        Operand::Absolute20(a) => {
+            if call {
+                vec![InstructionTextToken::new(
+                    format!("{a:#x}"),
+                    InstructionTextTokenKind::CodeRelativeAddress {
+                        value: *a as u64,
+                        size: None,
+                    },
+                )]
+            } else {
+                vec![InstructionTextToken::new(
+                    format!("{a:#x}"),
+                    InstructionTextTokenKind::PossibleAddress {
+                        value: *a as u64,
+                        size: None,
+                    },
+                )]
+            }
         }
     }
 }
