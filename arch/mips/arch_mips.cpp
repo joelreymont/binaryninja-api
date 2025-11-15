@@ -336,6 +336,17 @@ protected:
 		case MIPS_JALR:
 		case MIPS_JALR_HB:
 			result.delaySlots = 1;
+			// MIPS64R6 maps jr[.hb] $ra to jalr[.hb] $zero, $ra
+			// Check for this pattern and treat as return
+			if (instr.operands[0].operandClass != NONE && instr.operands[0].reg == REG_ZERO &&
+			    instr.operands[1].operandClass != NONE && instr.operands[1].reg == REG_RA)
+			{
+				result.AddBranch(FunctionReturn, 0, nullptr, hasBranchDelay);
+			}
+			else if (instr.operands[0].operandClass != NONE && instr.operands[0].reg == REG_ZERO)
+			{
+				result.AddBranch(UnresolvedBranch, 0, nullptr, hasBranchDelay);
+			}
 			break;
 
 		case MIPS_BGEZAL:

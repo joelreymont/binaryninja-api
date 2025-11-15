@@ -1425,12 +1425,30 @@ bool GetLowLevelILForInstruction(Architecture* arch, uint64_t addr, LowLevelILFu
 	case MIPS_JALR:
 	case MIPS_JALR_HB:
 	{
-		uint32_t operand = 1;
-		if (instr.operands[1].operandClass != NONE)
+		// MIPS64R6 maps jr[.hb] $ra to jalr[.hb] $zero, $ra
+		// Check for this pattern and treat as return
+		if (instr.operands[0].operandClass != NONE && instr.operands[0].reg == REG_ZERO &&
+		    instr.operands[1].operandClass != NONE && instr.operands[1].reg == REG_RA)
 		{
-			operand = 2;
+			il.AddInstruction(il.Return(ReadILOperand(il, instr, 2, registerSize(instr.operands[1]), addrSize)));
+			return false;
 		}
-		il.AddInstruction(il.Call(ReadILOperand(il, instr, operand, registerSize(instr.operands[operand]), addrSize, true)));
+		// jalr $zero, rs - indirect jump (not return)
+		else if (instr.operands[0].operandClass != NONE && instr.operands[0].reg == REG_ZERO)
+		{
+			il.AddInstruction(il.Jump(ReadILOperand(il, instr, 2, registerSize(instr.operands[1]), addrSize)));
+			return false;
+		}
+		// Standard jalr - indirect call
+		else
+		{
+			uint32_t operand = 1;
+			if (instr.operands[1].operandClass != NONE)
+			{
+				operand = 2;
+			}
+			il.AddInstruction(il.Call(ReadILOperand(il, instr, operand, registerSize(instr.operands[operand]), addrSize, true)));
+		}
 	}
 		break;
 	case MIPS_JR:
