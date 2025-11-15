@@ -2,9 +2,12 @@
 
 ## Current Status
 
-**Environment Limitation**: Binary Ninja is not installed in this build environment, so we cannot run runtime LLIL validation tests.
+**Environment Limitation**: Binary Ninja Free (downloaded and tested) does not include the SDK, Python API, or separate core library required for programmatic testing. Runtime LLIL validation requires a commercial Binary Ninja license with SDK access.
 
-However, we can document expected behavior and create test infrastructure.
+**Downloaded**: Binary Ninja Free for Linux (extracted to /tmp/binaryninja/)
+**Finding**: Free version is a monolithic binary without libbinaryninjacore.so or Python API
+
+However, we can document expected behavior and create test infrastructure for future validation.
 
 ## What We CAN Validate (Without Binary Ninja)
 

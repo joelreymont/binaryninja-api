@@ -145,7 +145,17 @@ fn gcc_real_pushm_address_mode() {
 
 ⚠️ MOVA/CALLA need full decoder tests
 ⚠️ ADDA/SUBA/CMPA need GCC test cases
-⚠️ LLIL output needs Binary Ninja runtime testing
+⚠️ LLIL output needs Binary Ninja runtime testing (requires commercial license with SDK)
+
+### Binary Ninja SDK Requirement
+
+**Attempted**: Downloaded Binary Ninja Free for Linux to enable LLIL validation
+**Finding**: Free version does not include:
+- Separate libbinaryninjacore.so library
+- Python API (binaryninja module)
+- SDK headers for plugin development
+
+**Conclusion**: LLIL runtime validation requires commercial Binary Ninja license with SDK access. The implementation can be validated once the plugin is built and loaded in a licensed Binary Ninja installation.
 
 ### Overall Assessment
 
