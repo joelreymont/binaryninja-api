@@ -1,0 +1,13 @@
+[package]
+name = "msp430-asm-extended"
+description = "Disassembler for MSP430 and MSP430X (20-bit) architectures"
+version = "0.4.0"
+authors = ["jrozner", "Binary Ninja MSP430X contributors"]
+edition = "2021"
+license = "MIT"
+homepage = "https://www.github.com/jrozner/msp430-asm"
+repository = "https://www.github.com/Vector35/binaryninja-api"
+
+[workspace]
+
+[dependencies]
