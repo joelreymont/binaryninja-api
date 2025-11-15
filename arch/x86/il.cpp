@@ -4247,6 +4247,40 @@ bool GetLowLevelILForInstruction(Architecture* arch, const uint64_t addr, LowLev
 		break;
 	}
 
+	case XED_ICLASS_BEXTR:
+	{
+		// BEXTR (Bit Extract) - Extract bits from source based on control operand
+		// Control operand format: [LENGTH(15:8)][START(7:0)]
+		// Semantic: dst = (src >> start) & ((1 << length) - 1)
+
+		ExprId src = ReadILOperand(il, xedd, addr, 1, 1);
+		ExprId control = ReadILOperand(il, xedd, addr, 2, 2);
+
+		// Extract START[7:0]
+		ExprId start = il.LowPart(1, control);
+
+		// Extract LENGTH[15:8] - get low 16 bits, then shift right by 8
+		ExprId controlLow = il.LowPart(2, control);
+		ExprId len = il.LogicalShiftRight(2, controlLow, il.Const(1, 8));
+
+		// Compute: (src >> start) & ((1 << len) - 1)
+		ExprId shifted = il.LogicalShiftRight(opOneLen, src, il.ZeroExtend(opOneLen, start));
+		ExprId mask_base = il.ShiftLeft(opOneLen, il.Const(opOneLen, 1), il.ZeroExtend(opOneLen, len));
+		ExprId mask = il.Sub(opOneLen, mask_base, il.Const(opOneLen, 1));
+		ExprId result = il.And(opOneLen, shifted, mask);
+
+		// Set destination register
+		il.AddInstruction(il.SetRegister(opOneLen, regOne, result));
+
+		// Set flags: ZF = (result == 0), CF and OF cleared
+		il.AddInstruction(il.SetFlag(IL_FLAG_Z,
+			il.CompareEqual(opOneLen, result, il.Const(opOneLen, 0))));
+		il.AddInstruction(il.SetFlag(IL_FLAG_C, il.Const(0, 0)));
+		il.AddInstruction(il.SetFlag(IL_FLAG_O, il.Const(0, 0)));
+
+		break;
+	}
+
 	default:
 		LiftAsIntrinsic();
 		break;
