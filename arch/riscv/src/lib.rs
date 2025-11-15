@@ -710,16 +710,17 @@ impl<D: RiscVDisassembler> Architecture for RiscVArch<D> {
                 res.add_branch(branch);
             }
             Op::Jalr(ref i) => {
-                // TODO handle the calls with rs1 == 0?
-                if i.rd().id() == 0 {
-                    let branch_type = if i.rs1().id() == 1 {
+                let branch_type = if i.rd().id() == 0 {
+                    if i.rs1().id() == 1 && i.imm() == 0 {
                         BranchKind::FunctionReturn
                     } else {
                         BranchKind::Unresolved
-                    };
+                    }
+                } else {
+                    BranchKind::Indirect
+                };
 
-                    res.add_branch(branch_type);
-                }
+                res.add_branch(branch_type);
             }
             Op::Beq(ref b)
             | Op::Bne(ref b)
