@@ -491,8 +491,27 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
         }
 
         // emulated
-        Instruction::Adc(_) => {
-            il.unimplemented().append();
+        Instruction::Adc(inst) => {
+            // ADC dst is emulated as ADDC #0, dst
+            // Effectively: dst = dst + carry
+            let size = match inst.operand_width() {
+                Some(width) => width_to_size(width),
+                None => 2,
+            };
+            let dest = lift_source_operand(&inst.destination().unwrap(), size, il);
+            let carry = il.flag(Flag::C);
+            // ADC adds zero plus carry, which is just adding the carry
+            let op = match inst.operand_width() {
+                Some(OperandWidth::Byte) => {
+                    il.sx(2, il.adc(size, il.const_int(size, 0), dest, carry)
+                        .with_flag_write(FlagWrite::All))
+                }
+                Some(OperandWidth::Word) | Some(OperandWidth::Address) | None => {
+                    il.adc(size, il.const_int(size, 0), dest, carry)
+                        .with_flag_write(FlagWrite::All)
+                }
+            };
+            emulated!(inst, il, op);
         }
         Instruction::Br(inst) => {
             let dest = if let Some(Operand::Immediate(dest)) = inst.destination() {
@@ -674,8 +693,27 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
             };
             emulated!(inst, il, op);
         }
-        Instruction::Sbc(_) => {
-            il.unimplemented().append();
+        Instruction::Sbc(inst) => {
+            // SBC dst is emulated as SUBC #0, dst
+            // Effectively: dst = dst - carry
+            let size = match inst.operand_width() {
+                Some(width) => width_to_size(width),
+                None => 2,
+            };
+            let dest = lift_source_operand(&inst.destination().unwrap(), size, il);
+            let carry = il.flag(Flag::C);
+            // SBC subtracts zero with borrow, which is just subtracting the borrow
+            let op = match inst.operand_width() {
+                Some(OperandWidth::Byte) => {
+                    il.sx(2, il.sbb(size, dest, il.const_int(size, 0), carry)
+                        .with_flag_write(FlagWrite::All))
+                }
+                Some(OperandWidth::Word) | Some(OperandWidth::Address) | None => {
+                    il.sbb(size, dest, il.const_int(size, 0), carry)
+                        .with_flag_write(FlagWrite::All)
+                }
+            };
+            emulated!(inst, il, op);
         }
         Instruction::Setc(_) => {
             // TODO: should we lift setting the C bit in the SR register as well?
