@@ -1947,11 +1947,9 @@ bool GetLowLevelILForInstruction(Architecture* arch, const uint64_t addr, LowLev
 		return false;
 
 	case XED_ICLASS_LAHF:
+		// Simplified: Load low byte of FLAGS into AH (issue #4920)
 		il.AddInstruction(il.SetRegister(1, XED_REG_AH,
-			il.Or(1, il.FlagBit(1, IL_FLAG_S, 7),
-			il.Or(1, il.FlagBit(1, IL_FLAG_Z, 6),
-			il.Or(1, il.FlagBit(1, IL_FLAG_A, 4),
-			il.Or(1, il.FlagBit(1, IL_FLAG_P, 2), il.FlagBit(1, IL_FLAG_C, 0)))))));
+			il.LowPart(1, il.Register(2, XED_REG_FLAGS))));
 		break;
 
 	case XED_ICLASS_LEAVE:
@@ -2812,51 +2810,18 @@ bool GetLowLevelILForInstruction(Architecture* arch, const uint64_t addr, LowLev
 		break;
 
 	case XED_ICLASS_PUSHF:
-		il.AddInstruction(il.Push(2,
-			il.Or(2, il.FlagBit(2, IL_FLAG_O, 11),
-			il.Or(2, il.FlagBit(2, IL_FLAG_D, 10),
-			il.Or(2, il.FlagBit(2, IL_FLAG_S, 7),
-			il.Or(2, il.FlagBit(2, IL_FLAG_Z, 6),
-			il.Or(2, il.FlagBit(2, IL_FLAG_A, 4),
-			il.Or(2, il.FlagBit(2, IL_FLAG_P, 2),
-						il.FlagBit(2, IL_FLAG_C, 0)))))))));
+		// Simplified: Push FLAGS register directly (issue #4920)
+		il.AddInstruction(il.Push(2, il.Register(2, XED_REG_FLAGS)));
 		break;
 
 	case XED_ICLASS_PUSHFD:
-		il.AddInstruction(il.Push(4,
-			il.Or(4, il.FlagBit(4, IL_FLAG_O, 11),
-			il.Or(4, il.FlagBit(4, IL_FLAG_D, 10),
-			il.Or(4, il.FlagBit(4, IL_FLAG_S, 7),
-			il.Or(4, il.FlagBit(4, IL_FLAG_Z, 6),
-			il.Or(4, il.FlagBit(4, IL_FLAG_A, 4),
-			il.Or(4, il.FlagBit(4, IL_FLAG_P, 2),
-						il.FlagBit(4, IL_FLAG_C, 0)))))))));
+		// Simplified: Push EFLAGS register directly (issue #4920)
+		il.AddInstruction(il.Push(4, il.Register(4, XED_REG_EFLAGS)));
 		break;
 
 	case XED_ICLASS_PUSHFQ:
-		il.AddInstruction(
-			il.Push(8,
-				il.Or(8,
-					il.FlagBit(8, IL_FLAG_O, 11),
-					il.Or(8,
-						il.FlagBit(8, IL_FLAG_D, 10),
-						il.Or(8,
-							il.FlagBit(8, IL_FLAG_S, 7),
-							il.Or(8,
-								il.FlagBit(8, IL_FLAG_Z, 6),
-								il.Or(8,
-									il.FlagBit(8, IL_FLAG_A, 4),
-									il.Or(8,
-										il.FlagBit(8, IL_FLAG_P, 2),
-										il.FlagBit(8, IL_FLAG_C, 0)
-									)
-								)
-							)
-						)
-					)
-				)
-			)
-		);
+		// Simplified: Push RFLAGS register directly (issue #4920)
+		il.AddInstruction(il.Push(8, il.Register(8, XED_REG_RFLAGS)));
 		break;
 
 	case XED_ICLASS_PUSH:
