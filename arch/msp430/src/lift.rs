@@ -424,8 +424,24 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
                 .append();
             auto_increment!(inst.source(), il);
         }
-        Instruction::Dadd(_) => {
-            il.unimplemented().append();
+        Instruction::Dadd(inst) => {
+            // DADD - Decimal (BCD) add
+            // Note: LLIL doesn't have a native BCD operation, so we implement this
+            // as regular binary addition. The decompilation won't be semantically
+            // perfect for BCD operations, but control flow will be correct.
+            let size = width_to_size(inst.operand_width());
+            let src = lift_source_operand(inst.source(), size, il);
+            let dest = lift_source_operand(inst.destination(), size, il);
+            let op = match inst.operand_width() {
+                OperandWidth::Byte => {
+                    il.sx(2, il.add(size, src, dest).with_flag_write(FlagWrite::All))
+                }
+                OperandWidth::Word | OperandWidth::Address => {
+                    il.add(size, src, dest).with_flag_write(FlagWrite::All)
+                }
+            };
+            two_operand!(inst.destination(), il, op);
+            auto_increment!(inst.source(), il);
         }
         Instruction::Bit(inst) => {
             let size = width_to_size(inst.operand_width());
@@ -543,8 +559,27 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
             // TODO: should we lift clearing the Z bit in the SR register as well?
             il.set_flag(Flag::Z, il.const_int(0, 0)).append();
         }
-        Instruction::Dadc(_) => {
-            il.unimplemented().append();
+        Instruction::Dadc(inst) => {
+            // DADC - Decimal (BCD) add with carry (emulated as DADD #0, dst)
+            // Note: LLIL doesn't have native BCD operations, so we implement this
+            // as regular binary addition with carry. Control flow will be correct.
+            let size = match inst.operand_width() {
+                Some(width) => width_to_size(width),
+                None => 2,
+            };
+            let dest = lift_source_operand(&inst.destination().unwrap(), size, il);
+            let carry = il.flag(Flag::C);
+            let op = match inst.operand_width() {
+                Some(OperandWidth::Byte) => {
+                    il.sx(2, il.adc(size, il.const_int(size, 0), dest, carry)
+                        .with_flag_write(FlagWrite::All))
+                }
+                Some(OperandWidth::Word) | Some(OperandWidth::Address) | None => {
+                    il.adc(size, il.const_int(size, 0), dest, carry)
+                        .with_flag_write(FlagWrite::All)
+                }
+            };
+            emulated!(inst, il, op);
         }
         Instruction::Dec(inst) => {
             let size = match inst.operand_width() {

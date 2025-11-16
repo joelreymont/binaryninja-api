@@ -336,6 +336,277 @@ def validate_rram(llil_instrs):
         'details': f"{dest_name} = {left_reg} s>> {shift_amount}" + (" + V flag cleared" if flag_cleared else "")
     }
 
+def validate_mov(llil_instrs):
+    """
+    Validate MOV instruction
+    Expected: sp = 0x4400
+    - Operation: LLIL_SET_REG
+    - Destination: sp
+    - Source: LLIL_CONST with value 0x4400
+    """
+    if len(llil_instrs) < 1:
+        raise ValidationError(f"Expected at least 1 instruction, got {len(llil_instrs)}")
+
+    instr = llil_instrs[0]
+
+    # Check operation
+    if instr.operation != LowLevelILOperation.LLIL_SET_REG:
+        raise ValidationError(f"Expected LLIL_SET_REG, got {instr.operation.name}")
+
+    # Check destination is sp
+    if not hasattr(instr, 'dest'):
+        raise ValidationError("SET_REG missing dest")
+
+    dest = instr.dest
+    dest_name = dest.name if hasattr(dest, 'name') else str(dest)
+    if dest_name != 'sp':
+        raise ValidationError(f"Expected dest sp, got {dest_name}")
+
+    # Check source is CONST
+    if not hasattr(instr, 'src'):
+        raise ValidationError("SET_REG missing src")
+
+    src = instr.src
+    if src.operation != LowLevelILOperation.LLIL_CONST:
+        raise ValidationError(f"Expected LLIL_CONST, got {src.operation.name}")
+
+    const_val = src.value.value if hasattr(src, 'value') else src.constant
+    if const_val != 0x4400:
+        raise ValidationError(f"Expected constant 0x4400, got {hex(const_val)}")
+
+    return {
+        'operation': 'LLIL_SET_REG',
+        'dest_reg': dest_name,
+        'const_value': hex(const_val),
+        'details': f"{dest_name} = {hex(const_val)}"
+    }
+
+def validate_call(llil_instrs):
+    """
+    Validate CALL instruction
+    Expected: call(0x443c)
+    - Operation: LLIL_CALL
+    - Destination: constant address 0x443c
+    """
+    if len(llil_instrs) < 1:
+        raise ValidationError(f"Expected at least 1 instruction, got {len(llil_instrs)}")
+
+    instr = llil_instrs[0]
+
+    # Check operation
+    if instr.operation != LowLevelILOperation.LLIL_CALL:
+        raise ValidationError(f"Expected LLIL_CALL, got {instr.operation.name}")
+
+    # Check destination
+    if not hasattr(instr, 'dest'):
+        raise ValidationError("CALL missing dest")
+
+    dest = instr.dest
+    if dest.operation != LowLevelILOperation.LLIL_CONST_PTR:
+        raise ValidationError(f"Expected LLIL_CONST_PTR for call dest, got {dest.operation.name}")
+
+    call_target = dest.value.value if hasattr(dest, 'value') else dest.constant
+    if call_target != 0x443c:
+        raise ValidationError(f"Expected call target 0x443c, got {hex(call_target)}")
+
+    return {
+        'operation': 'LLIL_CALL',
+        'target': hex(call_target),
+        'details': f"call({hex(call_target)})"
+    }
+
+def validate_ret(llil_instrs):
+    """
+    Validate RET instruction
+    Expected: <return> jump(pop)
+    - Operation: LLIL_RET
+    - Argument: LLIL_POP
+    """
+    if len(llil_instrs) != 1:
+        raise ValidationError(f"Expected 1 instruction, got {len(llil_instrs)}")
+
+    instr = llil_instrs[0]
+
+    # Check operation
+    if instr.operation != LowLevelILOperation.LLIL_RET:
+        raise ValidationError(f"Expected LLIL_RET, got {instr.operation.name}")
+
+    # Check return value is POP
+    if not hasattr(instr, 'dest'):
+        raise ValidationError("RET instruction missing dest operand")
+
+    ret_dest = instr.dest
+    if ret_dest.operation != LowLevelILOperation.LLIL_POP:
+        raise ValidationError(f"Expected POP for return value, got {ret_dest.operation.name}")
+
+    pop_size = ret_dest.size
+
+    return {
+        'operation': 'LLIL_RET',
+        'pop_size': pop_size,
+        'details': f"RET with POP(size={pop_size})"
+    }
+
+def validate_jnz(llil_instrs):
+    """
+    Validate JNZ (jump if not zero) instruction
+    Expected: if (not(flag:z)) then ... else ...
+    - Operation: LLIL_IF
+    - Condition: Involves Z flag
+    """
+    if len(llil_instrs) != 1:
+        raise ValidationError(f"Expected 1 instruction, got {len(llil_instrs)}")
+
+    instr = llil_instrs[0]
+
+    # Check operation
+    if instr.operation != LowLevelILOperation.LLIL_IF:
+        raise ValidationError(f"Expected LLIL_IF, got {instr.operation.name}")
+
+    # Check condition involves flag
+    if not hasattr(instr, 'condition'):
+        raise ValidationError("IF missing condition")
+
+    condition = instr.condition
+
+    # Should be a NOT of flag:z
+    if condition.operation != LowLevelILOperation.LLIL_NOT:
+        raise ValidationError(f"Expected LLIL_NOT for condition, got {condition.operation.name}")
+
+    # Check the operand is a flag
+    if not hasattr(condition, 'src'):
+        raise ValidationError("NOT condition missing src")
+
+    flag_check = condition.src
+    if flag_check.operation != LowLevelILOperation.LLIL_FLAG:
+        raise ValidationError(f"Expected LLIL_FLAG, got {flag_check.operation.name}")
+
+    # Verify it's the Z flag
+    flag_name = str(flag_check.src) if hasattr(flag_check, 'src') else str(flag_check)
+    if 'z' not in flag_name.lower():
+        raise ValidationError(f"Expected Z flag, got {flag_name}")
+
+    return {
+        'operation': 'LLIL_IF',
+        'condition': 'NOT(flag:z)',
+        'flag': 'z',
+        'details': 'Jump if not zero (Z flag clear)'
+    }
+
+def validate_swpb(llil_instrs):
+    """
+    Validate SWPB (swap bytes) instruction
+    Expected: r15 = rol.w(r15, 8)
+    - Operation: LLIL_SET_REG
+    - Destination: r15
+    - Source: LLIL_ROL with shift amount 8
+    """
+    if len(llil_instrs) != 1:
+        raise ValidationError(f"Expected 1 instruction, got {len(llil_instrs)}")
+
+    instr = llil_instrs[0]
+
+    # Check operation
+    if instr.operation != LowLevelILOperation.LLIL_SET_REG:
+        raise ValidationError(f"Expected LLIL_SET_REG, got {instr.operation.name}")
+
+    # Check destination
+    if not hasattr(instr, 'dest'):
+        raise ValidationError("SET_REG missing dest")
+
+    dest = instr.dest
+    dest_name = dest.name if hasattr(dest, 'name') else str(dest)
+    if dest_name != 'r15':
+        raise ValidationError(f"Expected dest r15, got {dest_name}")
+
+    # Check source is ROL
+    if not hasattr(instr, 'src'):
+        raise ValidationError("SET_REG missing src")
+
+    src = instr.src
+    if src.operation != LowLevelILOperation.LLIL_ROL:
+        raise ValidationError(f"Expected LLIL_ROL, got {src.operation.name}")
+
+    # Check ROL operands
+    if not hasattr(src, 'left') or not hasattr(src, 'right'):
+        raise ValidationError("ROL missing left or right operand")
+
+    # Check left is r15
+    left = src.left
+    if left.operation != LowLevelILOperation.LLIL_REG:
+        raise ValidationError(f"Expected REG for ROL left, got {left.operation.name}")
+
+    left_reg = left.src.name if hasattr(left.src, 'name') else str(left)
+    if left_reg != 'r15':
+        raise ValidationError(f"Expected r15 for ROL left, got {left_reg}")
+
+    # Check right is constant 8
+    right = src.right
+    if right.operation != LowLevelILOperation.LLIL_CONST:
+        raise ValidationError(f"Expected CONST for ROL right, got {right.operation.name}")
+
+    rotate_amount = right.value.value if hasattr(right, 'value') else right.constant
+    if rotate_amount != 8:
+        raise ValidationError(f"Expected rotate amount 8, got {rotate_amount}")
+
+    return {
+        'operation': 'LLIL_SET_REG (ROL)',
+        'dest_reg': dest_name,
+        'src_reg': left_reg,
+        'rotate_amount': rotate_amount,
+        'details': f"{dest_name} = rol({left_reg}, {rotate_amount})"
+    }
+
+def validate_sxt(llil_instrs):
+    """
+    Validate SXT (sign extend byte) instruction
+    Expected: r15 = sx.w(r15.b) with flag updates
+    - Operation: LLIL_SET_REG
+    - Destination: r15
+    - Source: LLIL_SX (sign extend)
+    - Side effects: Z, V, C flags set
+    """
+    if len(llil_instrs) < 2:
+        raise ValidationError(f"Expected at least 2 instructions, got {len(llil_instrs)}")
+
+    # Find the main SET_REG with SX operation
+    main_instr = None
+    for instr in llil_instrs:
+        if instr.operation == LowLevelILOperation.LLIL_SET_REG:
+            if hasattr(instr, 'src') and instr.src.operation == LowLevelILOperation.LLIL_SX:
+                main_instr = instr
+                break
+
+    if not main_instr:
+        raise ValidationError("No SET_REG with SX operation found")
+
+    # Check destination
+    dest = main_instr.dest
+    dest_name = dest.name if hasattr(dest, 'name') else str(dest)
+    if dest_name != 'r15':
+        raise ValidationError(f"Expected dest r15, got {dest_name}")
+
+    # Check source is SX
+    src = main_instr.src
+    if src.operation != LowLevelILOperation.LLIL_SX:
+        raise ValidationError(f"Expected LLIL_SX, got {src.operation.name}")
+
+    # Count flag updates
+    flag_updates = []
+    for instr in llil_instrs:
+        if instr.operation == LowLevelILOperation.LLIL_SET_FLAG:
+            if hasattr(instr, 'dest'):
+                flag_name = str(instr.dest)
+                flag_updates.append(flag_name)
+
+    return {
+        'operation': 'LLIL_SET_REG (SX)',
+        'dest_reg': dest_name,
+        'flag_updates': flag_updates,
+        'total_instrs': len(llil_instrs),
+        'details': f"{dest_name} = sx(r15.b) + {len(flag_updates)} flag updates"
+    }
+
 # Test case definitions
 TEST_CASES = [
     {
@@ -367,6 +638,42 @@ TEST_CASES = [
         'address': 0x4436,
         'validator': validate_rram,
         'description': 'Arithmetic shift right r14 by 2',
+    },
+    {
+        'name': 'MOV',
+        'address': 0x4400,
+        'validator': validate_mov,
+        'description': 'Move constant to SP register',
+    },
+    {
+        'name': 'CALL',
+        'address': 0x4406,
+        'validator': validate_call,
+        'description': 'Call to main function',
+    },
+    {
+        'name': 'RET',
+        'address': 0x441a,
+        'validator': validate_ret,
+        'description': 'Return from function',
+    },
+    {
+        'name': 'JNZ',
+        'address': 0x442c,
+        'validator': validate_jnz,
+        'description': 'Conditional jump if not zero',
+    },
+    {
+        'name': 'SWPB',
+        'address': 0x4426,
+        'validator': validate_swpb,
+        'description': 'Swap bytes in register',
+    },
+    {
+        'name': 'SXT',
+        'address': 0x440a,
+        'validator': validate_sxt,
+        'description': 'Sign extend byte to word',
     },
 ]
 
