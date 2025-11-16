@@ -106,6 +106,53 @@ fn try_decode_msp430x(first_word: u16, _data: &[u8]) -> Option<Result<Instructio
         return Some(Ok(Instruction::Reta(Reta::new())));
     }
 
+    // PUSHM: 0x1400-0x15FF (format: 0001 010n nnnn rrrr)
+    // n = count - 1 (0-15 for 1-16 registers)
+    // r = ending register (0-15)
+    // .A mode if bit 8 is set
+    if (first_word & 0xFE00) == 0x1400 {
+        let count = ((first_word >> 4) & 0xF) as u8 + 1;  // n + 1
+        let register = (first_word & 0xF) as u8;
+        let is_address = (first_word & 0x0100) != 0;  // .A mode
+        return Some(Ok(Instruction::Pushm(
+            PushPopMultiple::new("pushm", count, register, is_address)
+        )));
+    }
+
+    // POPM: 0x1600-0x17FF (format: 0001 011n nnnn rrrr)
+    if (first_word & 0xFE00) == 0x1600 {
+        let count = ((first_word >> 4) & 0xF) as u8 + 1;
+        let register = (first_word & 0xF) as u8;
+        let is_address = (first_word & 0x0100) != 0;
+        return Some(Ok(Instruction::Popm(
+            PushPopMultiple::new("popm", count, register, is_address)
+        )));
+    }
+
+    // Rotate/shift multiple: 0x0400-0x07FF (format: 0000 01xx xxnn rrrr)
+    // Bits [15:10] = 000001 (0x0400 range)
+    // Bits [9:8]   = xx (operation: 00=RRCM, 01=RRAM, 10=RLAM, 11=RRUM)
+    // Bits [7:6]   = nn (count - 1, 0-3 for 1-4 shifts)
+    // Bits [5:4]   = A/L bits (bit 4 = .A mode)
+    // Bits [3:0]   = rrrr (register)
+    if (first_word & 0xFC00) == 0x0400 {
+        let op = (first_word >> 8) & 0x3;          // Bits [9:8]
+        let count = ((first_word >> 6) & 0x3) as u8 + 1;  // Bits [7:6] + 1
+        let register = (first_word & 0xF) as u8;   // Bits [3:0]
+        let is_address = (first_word & 0x0010) != 0;  // Bit 4 = .A mode
+
+        return Some(Ok(match op {
+            0 => Instruction::Rrcm(RotateMultiple::new("rrcm", count, register, is_address)),
+            1 => Instruction::Rram(RotateMultiple::new("rram", count, register, is_address)),
+            2 => Instruction::Rlam(RotateMultiple::new("rlam", count, register, is_address)),
+            3 => Instruction::Rrum(RotateMultiple::new("rrum", count, register, is_address)),
+            _ => return None,
+        }));
+    }
+
+    // CALLA: 0x1340-0x137F (format: 0001 0011 01xx xxxx)
+    // TODO: Full CALLA decoding with different addressing modes
+
     None
 }
 
