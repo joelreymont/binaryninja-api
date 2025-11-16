@@ -1242,24 +1242,26 @@ impl<D: RiscVDisassembler> Architecture for RiscVArch<D> {
                         let tmp_reg: LowLevelILRegisterKind<Register<D>> =
                             LowLevelILRegisterKind::from_temp(0);
                         il.set_reg(max_width, tmp_reg, target).append();
-                        // indirect jump with storage of next address to non-`ra` register
+                        // indirect call with storage of return address to non-`ra` register
+                        // Fixed: Use il.call() instead of il.jump() since rd != 0 (issue #6273)
                         il.set_reg(
                             max_width,
                             Register::from(rd),
                             il.const_ptr(addr.wrapping_add(inst_len)),
                         )
                         .append();
-                        il.jump(tmp_reg).append();
+                        il.call(tmp_reg).append();
                     }
                     (_, _, _) => {
-                        // indirect jump with storage of next address to non-`ra` register
+                        // indirect call with storage of return address to non-`ra` register
+                        // Fixed: Use il.call() instead of il.jump() since rd != 0 (issue #6273)
                         il.set_reg(
                             max_width,
                             Register::from(rd),
                             il.const_ptr(addr.wrapping_add(inst_len)),
                         )
                         .append();
-                        il.jump(target).append();
+                        il.call(target).append();
                     }
                 }
             }
