@@ -165,24 +165,151 @@ fn decode_with_extension(ext: &ExtensionWord, data: &[u8]) -> Result<Instruction
     let (word_bytes, remaining) = data.split_at(2);
     let inst_word = u16::from_le_bytes([word_bytes[0], word_bytes[1]]);
 
-    // MSP430X address instructions (0xxx range with extension)
-    let opcode = (inst_word >> 4) & 0xF;
+    // Decode based on instruction word patterns
+    let upper_byte = (inst_word >> 8) & 0xFF;
+    let lower_nibble = inst_word & 0xF;
+    let mode_nibble = (inst_word >> 4) & 0xF;
 
-    // MOVA, CMPA, ADDA, SUBA basic decoding
-    // Format varies by addressing mode - this is simplified
-    match opcode {
-        MOVA_OPCODE => {
-            // Simplified MOVA decoding - register to register
-            let src_reg = ((inst_word >> 8) & 0xF) as u8;
-            let dst_reg = (inst_word & 0xF) as u8;
+    // MOVA instructions (0x00xx range)
+    if upper_byte == 0x00 {
+        let rd = lower_nibble as u8;
+        let ext_data = ext.dest_extension();
 
-            let source = operand::Operand::RegisterDirect(src_reg);
-            let dest = operand::Operand::RegisterDirect(dst_reg);
-
-            Ok(Instruction::Mova(AddressInstruction::new("mova", source, dest)))
+        match mode_nibble {
+            0x2 => {
+                // MOVA #imm20, Rd
+                if remaining.len() < 2 {
+                    return Err(DecodeError::MissingOperand);
+                }
+                let imm_low = u16::from_le_bytes([remaining[0], remaining[1]]);
+                let imm20 = ((ext_data as u32) << 16) | (imm_low as u32);
+                let source = operand::Operand::Immediate20(imm20);
+                let dest = operand::Operand::RegisterDirect(rd);
+                return Ok(Instruction::Mova(AddressInstruction::new("mova", source, dest)));
+            }
+            0x3 => {
+                // MOVA &abs20, Rd
+                if remaining.len() < 2 {
+                    return Err(DecodeError::MissingOperand);
+                }
+                let abs_low = u16::from_le_bytes([remaining[0], remaining[1]]);
+                let abs20 = ((ext_data as u32) << 16) | (abs_low as u32);
+                let source = operand::Operand::Absolute20(abs20);
+                let dest = operand::Operand::RegisterDirect(rd);
+                return Ok(Instruction::Mova(AddressInstruction::new("mova", source, dest)));
+            }
+            0x5 => {
+                // MOVA Rs, &abs20
+                if remaining.len() < 2 {
+                    return Err(DecodeError::MissingOperand);
+                }
+                let rs = ((inst_word >> 4) & 0xF) as u8;
+                let abs_low = u16::from_le_bytes([remaining[0], remaining[1]]);
+                let abs20 = ((ext_data as u32) << 16) | (abs_low as u32);
+                let source = operand::Operand::RegisterDirect(rs);
+                let dest = operand::Operand::Absolute20(abs20);
+                return Ok(Instruction::Mova(AddressInstruction::new("mova", source, dest)));
+            }
+            0x1 => {
+                // MOVA x(Rs), Rd
+                if remaining.len() < 2 {
+                    return Err(DecodeError::MissingOperand);
+                }
+                let rs = ((inst_word >> 4) & 0xF) as u8;
+                let offset_low = u16::from_le_bytes([remaining[0], remaining[1]]);
+                let offset20 = ((ext_data as i32) << 16) | (offset_low as i32);
+                let source = operand::Operand::Indexed20((rs, offset20));
+                let dest = operand::Operand::RegisterDirect(rd);
+                return Ok(Instruction::Mova(AddressInstruction::new("mova", source, dest)));
+            }
+            0x6 => {
+                // MOVA Rs, Rd (register to register)
+                let rs = ((inst_word >> 4) & 0xF) as u8;
+                let source = operand::Operand::RegisterDirect(rs);
+                let dest = operand::Operand::RegisterDirect(rd);
+                return Ok(Instruction::Mova(AddressInstruction::new("mova", source, dest)));
+            }
+            _ => {}
         }
-        _ => Err(DecodeError::InvalidOpcode(opcode)),
     }
+
+    // CMPA #imm20, Rd (0x0090-0x009F)
+    if upper_byte == 0x00 && mode_nibble == 0x9 {
+        if remaining.len() < 2 {
+            return Err(DecodeError::MissingOperand);
+        }
+        let rd = lower_nibble as u8;
+        let ext_data = ext.dest_extension();
+        let imm_low = u16::from_le_bytes([remaining[0], remaining[1]]);
+        let imm20 = ((ext_data as u32) << 16) | (imm_low as u32);
+        let source = operand::Operand::Immediate20(imm20);
+        let dest = operand::Operand::RegisterDirect(rd);
+        return Ok(Instruction::Cmpa(AddressInstruction::new("cmpa", source, dest)));
+    }
+
+    // ADDA #imm20, Rd (0x00A0-0x00AF)
+    if upper_byte == 0x00 && mode_nibble == 0xA {
+        if remaining.len() < 2 {
+            return Err(DecodeError::MissingOperand);
+        }
+        let rd = lower_nibble as u8;
+        let ext_data = ext.dest_extension();
+        let imm_low = u16::from_le_bytes([remaining[0], remaining[1]]);
+        let imm20 = ((ext_data as u32) << 16) | (imm_low as u32);
+        let source = operand::Operand::Immediate20(imm20);
+        let dest = operand::Operand::RegisterDirect(rd);
+        return Ok(Instruction::Adda(AddressInstruction::new("adda", source, dest)));
+    }
+
+    // SUBA #imm20, Rd (0x00B0-0x00BF)
+    if upper_byte == 0x00 && mode_nibble == 0xB {
+        if remaining.len() < 2 {
+            return Err(DecodeError::MissingOperand);
+        }
+        let rd = lower_nibble as u8;
+        let ext_data = ext.dest_extension();
+        let imm_low = u16::from_le_bytes([remaining[0], remaining[1]]);
+        let imm20 = ((ext_data as u32) << 16) | (imm_low as u32);
+        let source = operand::Operand::Immediate20(imm20);
+        let dest = operand::Operand::RegisterDirect(rd);
+        return Ok(Instruction::Suba(AddressInstruction::new("suba", source, dest)));
+    }
+
+    // CALLA instructions (0x13xx range)
+    if upper_byte == 0x13 {
+        let ext_data = ext.dest_extension();
+        match mode_nibble {
+            0x4 => {
+                // CALLA Rs (0x1340-0x134F)
+                let rs = lower_nibble as u8;
+                let dest = operand::Operand::RegisterDirect(rs);
+                return Ok(Instruction::Calla(Calla::new(dest)));
+            }
+            0x8 => {
+                // CALLA &abs20 (0x1380-0x138F)
+                if remaining.len() < 2 {
+                    return Err(DecodeError::MissingOperand);
+                }
+                let abs_low = u16::from_le_bytes([remaining[0], remaining[1]]);
+                let abs20 = ((ext_data as u32) << 16) | (abs_low as u32);
+                let dest = operand::Operand::Absolute20(abs20);
+                return Ok(Instruction::Calla(Calla::new(dest)));
+            }
+            0xB => {
+                // CALLA #imm20 (0x13B0-0x13BF)
+                if remaining.len() < 2 {
+                    return Err(DecodeError::MissingOperand);
+                }
+                let imm_low = u16::from_le_bytes([remaining[0], remaining[1]]);
+                let imm20 = ((ext_data as u32) << 16) | (imm_low as u32);
+                let dest = operand::Operand::Immediate20(imm20);
+                return Ok(Instruction::Calla(Calla::new(dest)));
+            }
+            _ => {}
+        }
+    }
+
+    Err(DecodeError::InvalidOpcode(upper_byte as u16))
 }
 
 /// Decode base MSP430 instruction (without extension word)
