@@ -182,28 +182,34 @@ macro_rules! conditional_jump {
     ($addr:ident, $inst:ident, $cond:ident, $il:ident) => {
         let true_addr = offset_to_absolute($addr, $inst.offset());
         let false_addr = $addr + $inst.size() as u64;
-        let mut new_true = true;
-        let mut new_false = false;
 
-        let mut true_label = $il.label_for_address(true_addr).unwrap_or_else(|| {
-            new_true = true;
-            LowLevelILLabel::new()
-        });
+        // Try to get existing labels for both branches
+        let true_label_opt = $il.label_for_address(true_addr);
+        let false_label_opt = $il.label_for_address(false_addr);
 
-        let mut false_label = $il.label_for_address(false_addr).unwrap_or_else(|| {
-            new_false = true;
-            LowLevelILLabel::new()
-        });
-
-        $il.if_expr($cond, &mut true_label, &mut false_label)
-            .append();
-
-        if new_true {
+        if let Some(mut true_label) = true_label_opt {
+            if let Some(mut false_label) = false_label_opt {
+                // Both labels exist - simple conditional
+                $il.if_expr($cond, &mut true_label, &mut false_label).append();
+            } else {
+                // True label exists, create false label for fall-through
+                let mut false_label = LowLevelILLabel::new();
+                $il.if_expr($cond, &mut true_label, &mut false_label).append();
+                $il.mark_label(&mut false_label);
+            }
+        } else if let Some(mut false_label) = false_label_opt {
+            // False label exists, create true label for jump
+            let mut true_label = LowLevelILLabel::new();
+            $il.if_expr($cond, &mut true_label, &mut false_label).append();
             $il.mark_label(&mut true_label);
             $il.jump($il.const_ptr(true_addr)).append();
-        }
-
-        if new_false {
+        } else {
+            // Neither label exists - create both
+            let mut true_label = LowLevelILLabel::new();
+            let mut false_label = LowLevelILLabel::new();
+            $il.if_expr($cond, &mut true_label, &mut false_label).append();
+            $il.mark_label(&mut true_label);
+            $il.jump($il.const_ptr(true_addr)).append();
             $il.mark_label(&mut false_label);
         }
     };
@@ -212,21 +218,27 @@ macro_rules! conditional_jump {
 pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMutableFunction) {
     match inst {
         Instruction::Rrc(inst) => {
-            let size = match inst.operand_width() {
-                Some(width) => width_to_size(width),
-                None => 2,
-            };
-            let src = il.const_int(size, 1);
-            let dest = lift_source_operand(inst.source(), size, il);
-            let op = match inst.operand_width() {
-                Some(OperandWidth::Byte) => {
-                    il.sx(2, il.rrc(size, dest, src).with_flag_write(FlagWrite::All))
-                }
-                Some(OperandWidth::Word) | Some(OperandWidth::Address) | None => {
-                    il.rrc(size, dest, src).with_flag_write(FlagWrite::All)
-                }
-            };
-            one_operand!(inst.source(), il, op);
+            // Check if operand is PC - if so, treat as unimplemented to avoid breaking control flow
+            if let Operand::RegisterDirect(0) = inst.source() {
+                // RRC PC is unusual and would break control flow analysis
+                il.unimplemented().append();
+            } else {
+                let size = match inst.operand_width() {
+                    Some(width) => width_to_size(width),
+                    None => 2,
+                };
+                let src = il.const_int(size, 1);
+                let dest = lift_source_operand(inst.source(), size, il);
+                let op = match inst.operand_width() {
+                    Some(OperandWidth::Byte) => {
+                        il.sx(2, il.rrc(size, dest, src).with_flag_write(FlagWrite::All))
+                    }
+                    Some(OperandWidth::Word) | Some(OperandWidth::Address) | None => {
+                        il.rrc(size, dest, src).with_flag_write(FlagWrite::All)
+                    }
+                };
+                one_operand!(inst.source(), il, op);
+            }
         }
         Instruction::Swpb(inst) => {
             let src = lift_source_operand(inst.source(), 2, il);
