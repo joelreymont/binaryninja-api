@@ -370,11 +370,37 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
             two_operand!(inst.destination(), il, op);
             auto_increment!(inst.source(), il);
         }
-        Instruction::Addc(_) => {
-            il.unimplemented().append();
+        Instruction::Addc(inst) => {
+            let size = width_to_size(inst.operand_width());
+            let src = lift_source_operand(inst.source(), size, il);
+            let dest = lift_source_operand(inst.destination(), size, il);
+            let carry = il.flag(Flag::C);
+            let op = match inst.operand_width() {
+                OperandWidth::Byte => {
+                    il.sx(2, il.adc(size, src, dest, carry).with_flag_write(FlagWrite::All))
+                }
+                OperandWidth::Word | OperandWidth::Address => {
+                    il.adc(size, src, dest, carry).with_flag_write(FlagWrite::All)
+                }
+            };
+            two_operand!(inst.destination(), il, op);
+            auto_increment!(inst.source(), il);
         }
-        Instruction::Subc(_) => {
-            il.unimplemented().append();
+        Instruction::Subc(inst) => {
+            let size = width_to_size(inst.operand_width());
+            let src = lift_source_operand(inst.source(), size, il);
+            let dest = lift_source_operand(inst.destination(), size, il);
+            let carry = il.flag(Flag::C);
+            let op = match inst.operand_width() {
+                OperandWidth::Byte => {
+                    il.sx(2, il.sbb(size, dest, src, carry).with_flag_write(FlagWrite::All))
+                }
+                OperandWidth::Word | OperandWidth::Address => {
+                    il.sbb(size, dest, src, carry).with_flag_write(FlagWrite::All)
+                }
+            };
+            two_operand!(inst.destination(), il, op);
+            auto_increment!(inst.source(), il);
         }
         Instruction::Sub(inst) => {
             let size = width_to_size(inst.operand_width());
