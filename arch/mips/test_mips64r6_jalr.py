@@ -20,7 +20,7 @@ import struct
 
 try:
     import binaryninja
-    from binaryninja import binaryview, Architecture
+    from binaryninja import binaryview, Architecture, BranchType
 except ImportError:
     print("ERROR: Binary Ninja not found. This test requires Binary Ninja to be installed.", file=sys.stderr)
     sys.exit(1)
@@ -50,29 +50,33 @@ REG_T2 = 10
 # Test cases: (instruction_bytes, description, expected_branch_type)
 test_cases = [
     # Issue #7355: MIPS64R6 return (jalr $zero, $ra)
-    (encode_jalr(REG_RA, 0, REG_ZERO, 0), "jalr $zero, $ra - function return (R6 jr $ra)", "FunctionReturn"),
+    (encode_jalr(REG_RA, 0, REG_ZERO, 0), "jalr $zero, $ra - function return (R6 jr $ra)", BranchType.FunctionReturn),
 
     # MIPS64R6 indirect jump (jalr $zero, $rs where rs != $ra)
-    (encode_jalr(REG_T0, 0, REG_ZERO, 0), "jalr $zero, $t0 - unresolved branch (R6 jr $t0)", "UnresolvedBranch"),
-    (encode_jalr(REG_T1, 0, REG_ZERO, 0), "jalr $zero, $t1 - unresolved branch (R6 jr $t1)", "UnresolvedBranch"),
+    (encode_jalr(REG_T0, 0, REG_ZERO, 0), "jalr $zero, $t0 - unresolved branch (R6 jr $t0)", BranchType.UnresolvedBranch),
+    (encode_jalr(REG_T1, 0, REG_ZERO, 0), "jalr $zero, $t1 - unresolved branch (R6 jr $t1)", BranchType.UnresolvedBranch),
 
     # Standard JALR indirect calls (rd != $zero)
-    (encode_jalr(REG_T0, 0, REG_RA, 0), "jalr $ra, $t0 - indirect call", "IndirectBranch"),
-    (encode_jalr(REG_T1, 0, REG_RA, 0), "jalr $ra, $t1 - indirect call", "IndirectBranch"),
-    (encode_jalr(REG_T2, 0, REG_RA, 0), "jalr $ra, $t2 - indirect call", "IndirectBranch"),
+    (encode_jalr(REG_T0, 0, REG_RA, 0), "jalr $ra, $t0 - indirect call", BranchType.IndirectBranch),
+    (encode_jalr(REG_T1, 0, REG_RA, 0), "jalr $ra, $t1 - indirect call", BranchType.IndirectBranch),
+    (encode_jalr(REG_T2, 0, REG_RA, 0), "jalr $ra, $t2 - indirect call", BranchType.IndirectBranch),
 
     # JALR.HB variants (hint bit set, same semantics)
-    (encode_jalr(REG_RA, 0, REG_ZERO, 1), "jalr.hb $zero, $ra - function return with hazard barrier", "FunctionReturn"),
-    (encode_jalr(REG_T0, 0, REG_ZERO, 1), "jalr.hb $zero, $t0 - unresolved branch with hazard barrier", "UnresolvedBranch"),
+    (encode_jalr(REG_RA, 0, REG_ZERO, 1), "jalr.hb $zero, $ra - function return with hazard barrier", BranchType.FunctionReturn),
+    (encode_jalr(REG_T0, 0, REG_ZERO, 1), "jalr.hb $zero, $t0 - unresolved branch with hazard barrier", BranchType.UnresolvedBranch),
 ]
 
 def test_mips_jalr_branch_detection():
     """Test MIPS JALR branch detection"""
-    # Try both mips64 and mips architectures
-    arch = Architecture['mips64'] or Architecture['mips']
-    if not arch:
-        print("ERROR: MIPS architecture not found", file=sys.stderr)
-        return False
+    # Try mips64, fall back to mips32
+    try:
+        arch = Architecture['mips64']
+    except KeyError:
+        try:
+            arch = Architecture['mips32']
+        except KeyError:
+            print("ERROR: MIPS architecture not found (tried mips64, mips32)", file=sys.stderr)
+            return False
 
     print(f"Testing MIPS64R6 JALR branch detection ({len(test_cases)} tests)...", file=sys.stderr)
     print(f"Using architecture: {arch.name}", file=sys.stderr)
@@ -104,7 +108,7 @@ def test_mips_jalr_branch_detection():
 
             # Check branch type
             branch = info.branches[0]
-            actual_type = str(branch.type).split('.')[-1]  # Get enum name
+            actual_type = branch.type
 
             if actual_type != expected_type:
                 print(f"FAIL Test {test_i + 1}: {description}")
@@ -122,10 +126,15 @@ def test_mips_jalr_branch_detection():
 
 def test_mips_jalr_il_lifting():
     """Test MIPS JALR IL lifting"""
-    arch = Architecture['mips64'] or Architecture['mips']
-    if not arch:
-        print("ERROR: MIPS architecture not found", file=sys.stderr)
-        return False
+    # Try mips64, fall back to mips32
+    try:
+        arch = Architecture['mips64']
+    except KeyError:
+        try:
+            arch = Architecture['mips32']
+        except KeyError:
+            print("ERROR: MIPS architecture not found (tried mips64, mips32)", file=sys.stderr)
+            return False
 
     print("\nTesting MIPS64R6 JALR IL lifting...", file=sys.stderr)
 

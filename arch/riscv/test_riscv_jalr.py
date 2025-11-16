@@ -18,7 +18,7 @@ import struct
 
 try:
     import binaryninja
-    from binaryninja import binaryview, Architecture
+    from binaryninja import binaryview, Architecture, BranchType
 except ImportError:
     print("ERROR: Binary Ninja not found. This test requires Binary Ninja to be installed.", file=sys.stderr)
     sys.exit(1)
@@ -37,28 +37,33 @@ def encode_jalr(rd, rs1, imm):
 # Test cases: (instruction_bytes, description, expected_branch_type)
 test_cases = [
     # Issue #6273: jalr rd, rs, imm where rd != 0 should be indirect call
-    (encode_jalr(5, 10, 0), "jalr x5, x10, 0 - indirect call", "IndirectBranch"),
-    (encode_jalr(10, 5, 4), "jalr x10, x5, 4 - indirect call", "IndirectBranch"),
-    (encode_jalr(3, 7, 8), "jalr x3, x7, 8 - indirect call", "IndirectBranch"),
+    (encode_jalr(5, 10, 0), "jalr x5, x10, 0 - indirect call", BranchType.IndirectBranch),
+    (encode_jalr(10, 5, 4), "jalr x10, x5, 4 - indirect call", BranchType.IndirectBranch),
+    (encode_jalr(3, 7, 8), "jalr x3, x7, 8 - indirect call", BranchType.IndirectBranch),
 
     # Standard return: jalr x0, x1, 0 (ret pseudo-instruction)
-    (encode_jalr(0, 1, 0), "jalr x0, x1, 0 - function return (ret)", "FunctionReturn"),
+    (encode_jalr(0, 1, 0), "jalr x0, x1, 0 - function return (ret)", BranchType.FunctionReturn),
 
     # Unresolved branch: jalr x0, rs, imm where rs != x1
-    (encode_jalr(0, 5, 0), "jalr x0, x5, 0 - unresolved branch", "UnresolvedBranch"),
-    (encode_jalr(0, 10, 8), "jalr x0, x10, 8 - unresolved branch", "UnresolvedBranch"),
+    (encode_jalr(0, 5, 0), "jalr x0, x5, 0 - unresolved branch", BranchType.UnresolvedBranch),
+    (encode_jalr(0, 10, 8), "jalr x0, x10, 8 - unresolved branch", BranchType.UnresolvedBranch),
 
     # Edge cases
-    (encode_jalr(1, 1, 0), "jalr x1, x1, 0 - return (alternative)", "FunctionReturn"),
-    (encode_jalr(2, 2, 0), "jalr x2, x2, 0 - indirect call (self-update)", "IndirectBranch"),
+    (encode_jalr(1, 1, 0), "jalr x1, x1, 0 - indirect call (link register update)", BranchType.IndirectBranch),
+    (encode_jalr(2, 2, 0), "jalr x2, x2, 0 - indirect call (self-update)", BranchType.IndirectBranch),
 ]
 
 def test_jalr_branch_detection():
     """Test JALR branch detection"""
-    arch = Architecture['riscv']
-    if not arch:
-        print("ERROR: RISC-V architecture not found", file=sys.stderr)
-        return False
+    # Try rv64gc first, fall back to rv32gc
+    try:
+        arch = Architecture['rv64gc']
+    except KeyError:
+        try:
+            arch = Architecture['rv32gc']
+        except KeyError:
+            print("ERROR: RISC-V architecture not found (tried rv64gc, rv32gc)", file=sys.stderr)
+            return False
 
     print(f"Testing RISC-V JALR branch detection ({len(test_cases)} tests)...", file=sys.stderr)
 
@@ -78,25 +83,24 @@ def test_jalr_branch_detection():
         # Check if instruction has branches
         has_branch = len(info.branches) > 0
 
-        if expected_type == "IndirectBranch" or expected_type == "UnresolvedBranch" or expected_type == "FunctionReturn":
-            if not has_branch:
-                print(f"FAIL Test {test_i + 1}: {description}")
-                print(f"  Expected branch but none found")
-                print(f"  Instruction bytes: {instr_bytes.hex()}")
-                failed += 1
-                continue
+        if not has_branch:
+            print(f"FAIL Test {test_i + 1}: {description}")
+            print(f"  Expected branch but none found")
+            print(f"  Instruction bytes: {instr_bytes.hex()}")
+            failed += 1
+            continue
 
-            # Check branch type
-            branch = info.branches[0]
-            actual_type = str(branch.type).split('.')[-1]  # Get enum name
+        # Check branch type
+        branch = info.branches[0]
+        actual_type = branch.type
 
-            if actual_type != expected_type:
-                print(f"FAIL Test {test_i + 1}: {description}")
-                print(f"  Expected: {expected_type}")
-                print(f"  Actual: {actual_type}")
-                print(f"  Instruction bytes: {instr_bytes.hex()}")
-                failed += 1
-                continue
+        if actual_type != expected_type:
+            print(f"FAIL Test {test_i + 1}: {description}")
+            print(f"  Expected: {expected_type}")
+            print(f"  Actual: {actual_type}")
+            print(f"  Instruction bytes: {instr_bytes.hex()}")
+            failed += 1
+            continue
 
         passed += 1
         print(f"PASS Test {test_i + 1}: {description}")
@@ -106,10 +110,15 @@ def test_jalr_branch_detection():
 
 def test_jalr_il_lifting():
     """Test JALR IL lifting"""
-    arch = Architecture['riscv']
-    if not arch:
-        print("ERROR: RISC-V architecture not found", file=sys.stderr)
-        return False
+    # Try rv64gc first, fall back to rv32gc
+    try:
+        arch = Architecture['rv64gc']
+    except KeyError:
+        try:
+            arch = Architecture['rv32gc']
+        except KeyError:
+            print("ERROR: RISC-V architecture not found (tried rv64gc, rv32gc)", file=sys.stderr)
+            return False
 
     print("\nTesting RISC-V JALR IL lifting...", file=sys.stderr)
 

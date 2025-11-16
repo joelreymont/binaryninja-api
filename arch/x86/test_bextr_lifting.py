@@ -35,18 +35,18 @@ test_cases_x64 = [
     # Control in ecx: START=ecx[7:0], LENGTH=ecx[15:8]
     (b'\xC4\xE2\x70\xF7\xC3',
      "bextr eax, ebx, ecx",
-     ["LLIL_LSR", "LLIL_AND", "LLIL_SHIFT_LEFT"]),  # Should have semantic operations
+     ["u>>", "&", "<<"]),  # Should have semantic operations (shift right, and, shift left)
 
     # bextr edx, [rsi], edi  (VEX.128.0F38.W0 F7 16)
     (b'\xC4\xE2\x40\xF7\x16',
      "bextr edx, [rsi], edi",
-     ["LLIL_LOAD", "LLIL_LSR", "LLIL_AND"]),
+     ["[rsi]", "u>>", "&"]),  # Should have load, shift right, and
 
     # BEXTR r64, r/m64, r64 (VEX.LZ.0F38.W1 F7 /r)
     # bextr rax, rbx, rcx  (VEX.128.0F38.W1 F7 C3)
     (b'\xC4\xE2\xF0\xF7\xC3',
      "bextr rax, rbx, rcx",
-     ["LLIL_LSR", "LLIL_AND", "LLIL_SHIFT_LEFT"]),
+     ["u>>", "&", "<<"]),  # Should have semantic operations
 ]
 
 def test_bextr_lifting_x64():
@@ -106,8 +106,8 @@ def test_bextr_lifting_x64():
 
         # Verify it's actually doing bit extraction semantics
         # Should have: (src >> start) & mask
-        has_shift_right = 'LLIL_LSR' in il_str or 'LLIL_ASR' in il_str
-        has_and = 'LLIL_AND' in il_str
+        has_shift_right = 'u>>' in il_str or 's>>' in il_str
+        has_and = '&' in il_str
 
         if not (has_shift_right and has_and):
             print(f"FAIL Test {test_i + 1}: {description}")

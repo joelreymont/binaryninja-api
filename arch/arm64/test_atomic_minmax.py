@@ -159,14 +159,7 @@ def test_atomic_minmax_lifting():
             print(f"SKIP Test {test_i + 1}: Could not lift instruction")
             continue
 
-        # Check that it's lifted as intrinsic
-        if 'LLIL_INTRINSIC' not in actual_lift:
-            print(f"FAIL Test {test_i + 1}: {bytecode.hex()}")
-            print(f"  Expected intrinsic but got: {actual_lift}")
-            failed += 1
-            continue
-
-        # Check that it's the right intrinsic
+        # Check that it's the right intrinsic (pretty-printed format shows as function call)
         if expected_intrinsic not in actual_lift:
             print(f"FAIL Test {test_i + 1}: {bytecode.hex()}")
             print(f"  Expected intrinsic: {expected_intrinsic}")
@@ -201,15 +194,16 @@ def test_atomic_output_registers():
             print(f"SKIP: {name}")
             continue
 
-        # LD* instructions should have SET_REG before INTRINSIC
-        # ST* instructions should just have INTRINSIC
-        has_set_reg = 'LLIL_SET_REG' in actual_lift[:50]  # Check beginning of IL
+        # LD* instructions should have register assignment (x = ...)
+        # ST* instructions should just have function call without assignment
+        # In pretty-printed format, assignments show as "reg = intrinsic(...)"
+        has_output_reg = ' = __{}'.format(name) in actual_lift
 
-        if should_have_output and not has_set_reg:
+        if should_have_output and not has_output_reg:
             print(f"FAIL: {name} should have output register")
             print(f"  IL: {actual_lift}")
             failed += 1
-        elif not should_have_output and has_set_reg:
+        elif not should_have_output and has_output_reg:
             print(f"FAIL: {name} should NOT have output register")
             print(f"  IL: {actual_lift}")
             failed += 1
