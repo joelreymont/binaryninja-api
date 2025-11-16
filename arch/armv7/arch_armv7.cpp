@@ -1413,6 +1413,10 @@ public:
 			return "ExclusiveMonitorsPass";
 		case ARMV7_INTRIN_SET_EXCLUSIVE_MONITORS:
 			return "SetExclusiveMonitors";
+		case ARMV7_INTRIN_CLZ:
+			return "__clz";
+		case ARMV7_INTRIN_RBIT:
+			return "__rbit";
 		default:
 			return "";
 		}
@@ -1427,6 +1431,8 @@ public:
 				ARMV7_INTRIN_COPROC_SENDTWOWORDS,
 				ARMV7_INTRIN_EXCLUSIVE_MONITORS_PASS,
 				ARMV7_INTRIN_SET_EXCLUSIVE_MONITORS,
+				ARMV7_INTRIN_CLZ,
+				ARMV7_INTRIN_RBIT,
 		};
 	}
 
@@ -1471,6 +1477,11 @@ public:
 				NameAndType("address", Type::PointerType(4, Confidence(Type::VoidType(), 0), Confidence(false), Confidence(false), PointerReferenceType)),
 				NameAndType("size", Type::IntegerType(1, false)),
 			};
+		case ARMV7_INTRIN_CLZ:
+		case ARMV7_INTRIN_RBIT:
+			return {
+				NameAndType("value", Type::IntegerType(4, false)),
+			};
 		default:
 			return vector<NameAndType>();
 		}
@@ -1486,6 +1497,9 @@ public:
 			return { Type::IntegerType(4, false), Type::IntegerType(4, false) };
 		case ARMV7_INTRIN_EXCLUSIVE_MONITORS_PASS:
 			return { Type::BoolType() };
+		case ARMV7_INTRIN_CLZ:
+		case ARMV7_INTRIN_RBIT:
+			return { Type::IntegerType(4, false) };
 		default:
 			return vector<Confidence<Ref<Type>>>();
 		}
