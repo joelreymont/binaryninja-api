@@ -343,9 +343,16 @@ protected:
 			{
 				result.AddBranch(FunctionReturn, 0, nullptr, hasBranchDelay);
 			}
+			// MIPS64R6: jalr $zero, $rs (where rs != $ra) - indirect jump
 			else if (instr.operands[0].operandClass != NONE && instr.operands[0].reg == REG_ZERO)
 			{
 				result.AddBranch(UnresolvedBranch, 0, nullptr, hasBranchDelay);
+			}
+			// Standard jalr $rd, $rs (where rd != $zero) - indirect call
+			// Fixed: Add branch for indirect calls (issue #7355)
+			else
+			{
+				result.AddBranch(IndirectBranch, 0, nullptr, hasBranchDelay);
 			}
 			break;
 
