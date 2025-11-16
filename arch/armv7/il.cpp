@@ -815,27 +815,11 @@ bool GetLowLevelILForArmInstruction(Architecture* arch, uint64_t addr, LowLevelI
 						)));
 			break;
 		case ARMV7_CLZ:
-			ConditionExecute(addr, instr.cond, instr, il, [&](size_t, Instruction&, LowLevelILFunction& il){
-				//Count leading zeros
-				//
-				// TEMP0 = 0
-				// TEMP1 = op2.reg
-				// while (TEMP1 != 0)
-				// 		TEMP1 = TEMP1 >> 1
-				// 		TEMP0 = TEMP0 + 1
-				// op1.reg = 32 - TEMP0
-				il.AddInstruction(il.SetRegister(4, LLIL_TEMP(0), il.Const(4, 0)));
-				il.AddInstruction(il.SetRegister(4, LLIL_TEMP(1), ReadRegisterOrPointer(il, op2, addr)));
-				il.AddInstruction(il.Goto(loopStart));
-				il.MarkLabel(loopStart);
-				il.AddInstruction(il.If(il.CompareNotEqual(4, il.Register(4, LLIL_TEMP(1)), il.Const(4, 0)), loopBody, loopExit));
-				il.MarkLabel(loopBody);
-				il.AddInstruction(il.SetRegister(4, LLIL_TEMP(1), il.LogicalShiftRight(4, il.Register(4, LLIL_TEMP(1)), il.Const(4,1))));
-				il.AddInstruction(il.SetRegister(4, LLIL_TEMP(0), il.Add(4, il.Register(4, LLIL_TEMP(0)), il.Const(4,1))));
-				il.AddInstruction(il.Goto(loopStart));
-				il.MarkLabel(loopExit);
-				il.AddInstruction(SetRegisterOrBranch(il, op1.reg, il.Sub(4, il.Const(4, 32), il.Register(4, LLIL_TEMP(0)))));
-			});
+			// Use intrinsic for count leading zeros, matching Thumb2 implementation
+			ConditionExecute(il, instr.cond, il.Intrinsic(
+				{RegisterOrFlag::Register(op1.reg)},
+				ARMV7_INTRIN_CLZ,
+				{ReadRegisterOrPointer(il, op2, addr)}));
 			break;
 		case ARMV7_CMN:
 			ConditionExecute(il, instr.cond, il.Add(get_register_size(op1.reg),
