@@ -615,4 +615,178 @@ mod tests {
             assert_eq!(inst.size(), 2);
         }
     }
+
+    // MSP430X Address Instruction Tests
+    // Testing MOVA, CMPA, ADDA, SUBA with various addressing modes
+
+    #[test]
+    fn mova_immediate20_to_register() {
+        // MOVA #0x12345, r15
+        // Extension word: 0x1801, Instruction: 0x002F, Immediate: 0x2345
+        let data = [0x01, 0x18, 0x2F, 0x00, 0x45, 0x23];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode MOVA #imm20, Rd");
+        if let Ok(Instruction::Mova(mova)) = inst {
+            assert_eq!(mova.size(), 4); // Instruction word + immediate word (extension word not counted)
+            assert_eq!(*mova.source(), Operand::Immediate20(0x12345));
+            assert_eq!(*mova.destination(), Operand::RegisterDirect(15));
+        } else {
+            panic!("Expected MOVA instruction");
+        }
+    }
+
+    #[test]
+    fn mova_absolute20_to_register() {
+        // MOVA &0x10000, r14
+        // Extension word: 0x1801, Instruction: 0x003E, Absolute: 0x0000
+        let data = [0x01, 0x18, 0x3E, 0x00, 0x00, 0x00];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode MOVA &abs20, Rd");
+        if let Ok(Instruction::Mova(mova)) = inst {
+            assert_eq!(mova.size(), 4); // Instruction word + absolute word
+            assert_eq!(*mova.source(), Operand::Absolute20(0x10000));
+            assert_eq!(*mova.destination(), Operand::RegisterDirect(14));
+        } else {
+            panic!("Expected MOVA instruction");
+        }
+    }
+
+    #[test]
+    fn mova_register_to_register() {
+        // MOVA r6, r15  (using mode 0x6 which encodes source in mode nibble)
+        // Extension word: 0x1800, Instruction: 0x006F (mode[7:4]=6=r6, dest[3:0]=F=r15)
+        let data = [0x00, 0x18, 0x6F, 0x00];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode MOVA Rs, Rd");
+        if let Ok(Instruction::Mova(mova)) = inst {
+            assert_eq!(mova.size(), 2); // Just instruction word
+            assert_eq!(*mova.source(), Operand::RegisterDirect(6));
+            assert_eq!(*mova.destination(), Operand::RegisterDirect(15));
+        } else {
+            panic!("Expected MOVA instruction");
+        }
+    }
+
+    #[test]
+    fn cmpa_immediate20() {
+        // CMPA #0x12345, r15
+        // Extension word: 0x1801, Instruction: 0x009F, Immediate: 0x2345
+        let data = [0x01, 0x18, 0x9F, 0x00, 0x45, 0x23];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode CMPA #imm20, Rd");
+        if let Ok(Instruction::Cmpa(cmpa)) = inst {
+            assert_eq!(cmpa.size(), 4); // Instruction word + immediate word
+            assert_eq!(*cmpa.source(), Operand::Immediate20(0x12345));
+            assert_eq!(*cmpa.destination(), Operand::RegisterDirect(15));
+        } else {
+            panic!("Expected CMPA instruction");
+        }
+    }
+
+    #[test]
+    fn adda_immediate20() {
+        // ADDA #0x1000, r15
+        // Extension word: 0x1800, Instruction: 0x00AF, Immediate: 0x1000
+        let data = [0x00, 0x18, 0xAF, 0x00, 0x00, 0x10];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode ADDA #imm20, Rd");
+        if let Ok(Instruction::Adda(adda)) = inst {
+            assert_eq!(adda.size(), 4); // Instruction word + immediate word
+            assert_eq!(*adda.source(), Operand::Immediate20(0x1000));
+            assert_eq!(*adda.destination(), Operand::RegisterDirect(15));
+        } else {
+            panic!("Expected ADDA instruction");
+        }
+    }
+
+    #[test]
+    fn suba_immediate20() {
+        // SUBA #0x2000, r15
+        // Extension word: 0x1800, Instruction: 0x00BF, Immediate: 0x2000
+        let data = [0x00, 0x18, 0xBF, 0x00, 0x00, 0x20];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode SUBA #imm20, Rd");
+        if let Ok(Instruction::Suba(suba)) = inst {
+            assert_eq!(suba.size(), 4); // Instruction word + immediate word
+            assert_eq!(*suba.source(), Operand::Immediate20(0x2000));
+            assert_eq!(*suba.destination(), Operand::RegisterDirect(15));
+        } else {
+            panic!("Expected SUBA instruction");
+        }
+    }
+
+    #[test]
+    fn calla_register() {
+        // CALLA r15
+        // Extension word: 0x1800, Instruction: 0x134F
+        let data = [0x00, 0x18, 0x4F, 0x13];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode CALLA Rs");
+        if let Ok(Instruction::Calla(calla)) = inst {
+            assert_eq!(calla.size(), 2); // Just instruction word
+            assert_eq!(*calla.destination(), Operand::RegisterDirect(15));
+        } else {
+            panic!("Expected CALLA instruction");
+        }
+    }
+
+    #[test]
+    fn calla_absolute20() {
+        // CALLA &0x10000
+        // Extension word: 0x1801, Instruction: 0x1380, Absolute: 0x0000
+        let data = [0x01, 0x18, 0x80, 0x13, 0x00, 0x00];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode CALLA &abs20");
+        if let Ok(Instruction::Calla(calla)) = inst {
+            assert_eq!(calla.size(), 4); // Instruction word + absolute word
+            assert_eq!(*calla.destination(), Operand::Absolute20(0x10000));
+        } else {
+            panic!("Expected CALLA instruction");
+        }
+    }
+
+    #[test]
+    fn calla_immediate20() {
+        // CALLA #0x12345
+        // Extension word: 0x1801, Instruction: 0x13B0, Immediate: 0x2345
+        let data = [0x01, 0x18, 0xB0, 0x13, 0x45, 0x23];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode CALLA #imm20");
+        if let Ok(Instruction::Calla(calla)) = inst {
+            assert_eq!(calla.size(), 4); // Instruction word + immediate word
+            assert_eq!(*calla.destination(), Operand::Immediate20(0x12345));
+        } else {
+            panic!("Expected CALLA instruction");
+        }
+    }
+
+    #[test]
+    fn bra_register() {
+        // BRA r15
+        // Extension word: 0x1800, Instruction: 0x00CF
+        let data = [0x00, 0x18, 0xCF, 0x00];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode BRA Rs");
+        if let Ok(Instruction::Bra(bra)) = inst {
+            assert_eq!(bra.size(), 2); // Just instruction word
+            assert_eq!(*bra.destination(), Operand::RegisterDirect(15));
+        } else {
+            panic!("Expected BRA instruction");
+        }
+    }
+
+    #[test]
+    fn bra_absolute20() {
+        // BRA &0x10000
+        // Extension word: 0x1801, Instruction: 0x00C0, Absolute: 0x0000
+        let data = [0x01, 0x18, 0xC0, 0x00, 0x00, 0x00];
+        let inst = decode(&data);
+        assert!(inst.is_ok(), "Failed to decode BRA &abs20");
+        if let Ok(Instruction::Bra(bra)) = inst {
+            assert_eq!(bra.size(), 4); // Instruction word + absolute word
+            assert_eq!(*bra.destination(), Operand::Absolute20(0x10000));
+        } else {
+            panic!("Expected BRA instruction");
+        }
+    }
 }
