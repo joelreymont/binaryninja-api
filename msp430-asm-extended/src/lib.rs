@@ -1,3 +1,22 @@
+//! MSP430X Extended Architecture Decoder
+//!
+//! This crate provides instruction decoding for both base MSP430 (16-bit) and
+//! MSP430X (20-bit extended) architectures.
+//!
+//! ## MSP430X Extensions
+//!
+//! The MSP430X adds 20-bit addressing and new instructions:
+//! - MOVA, CMPA, ADDA, SUBA: 20-bit address operations
+//! - BRA: 20-bit branch
+//! - CALLA, RETA: 20-bit call/return
+//! - RRCM, RRAM, RLAM, RRUM: Multi-bit rotate/shift
+//! - PUSHM, POPM: Push/pop multiple registers
+//!
+//! ## Extension Words
+//!
+//! MSP430X uses extension words (0x18xx prefix) to encode 20-bit operands.
+//! Instructions with extension words can be 4-6 bytes total.
+
 pub mod decode_error;
 pub mod emulate;
 pub mod extension_word;
@@ -150,8 +169,9 @@ fn try_decode_msp430x(first_word: u16, _data: &[u8]) -> Option<Result<Instructio
         }));
     }
 
-    // CALLA: 0x1340-0x137F (format: 0001 0011 01xx xxxx)
-    // TODO: Full CALLA decoding with different addressing modes
+    // CALLA without extension word: 0x1340-0x137F (format: 0001 0011 01xx xxxx)
+    // Note: CALLA with extension words is decoded in decode_with_extension()
+    // For basic register mode CALLA without extension, implement here if needed
 
     None
 }
