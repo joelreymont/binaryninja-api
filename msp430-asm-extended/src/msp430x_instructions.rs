@@ -187,6 +187,38 @@ impl fmt::Display for PushPopMultiple {
     }
 }
 
+/// BRA - Branch (20-bit address)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Bra {
+    destination: Operand,
+}
+
+impl Bra {
+    pub fn new(destination: Operand) -> Self {
+        Bra { destination }
+    }
+
+    pub fn destination(&self) -> &Operand {
+        &self.destination
+    }
+
+    pub fn size(&self) -> usize {
+        match self.destination {
+            Operand::RegisterDirect(_) => 2,
+            Operand::Indexed(_) | Operand::Indexed20(_) | Operand::Symbolic(_)
+            | Operand::Symbolic20(_) | Operand::Absolute(_) | Operand::Absolute20(_) => 4,
+            Operand::Immediate(_) | Operand::Immediate20(_) => 4,
+            _ => 2,
+        }
+    }
+}
+
+impl fmt::Display for Bra {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "bra {}", self.destination)
+    }
+}
+
 /// RETA - Return from subroutine (20-bit)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Reta;
@@ -246,6 +278,15 @@ mod tests {
     fn popm_display() {
         let inst = PushPopMultiple::new("popm", 3, 10, false);
         assert_eq!(format!("{}", inst), "popm.w #3, r10");
+    }
+
+    #[test]
+    fn bra_display() {
+        let inst = Bra::new(Operand::Absolute20(0x10000));
+        assert_eq!(format!("{}", inst), "bra &0x10000");
+
+        let inst = Bra::new(Operand::RegisterDirect(15));
+        assert_eq!(format!("{}", inst), "bra r15");
     }
 
     #[test]

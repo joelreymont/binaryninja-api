@@ -309,6 +309,33 @@ fn decode_with_extension(ext: &ExtensionWord, data: &[u8]) -> Result<Instruction
         }
     }
 
+    // BRA instructions (similar encoding to MOVA, but unconditional branch)
+    // BRA is encoded as MOVA to PC in some variants
+    // Extension word + instruction variants:
+    // - BRA Rdst (0x00Cx range) - Register mode
+    // - BRA &abs20 (0x00Cx + abs20 word)
+    // - BRA #imm20 (0x00Cx + imm20 word)
+    if upper_byte == 0x00 && mode_nibble == 0xC {
+        // BRA Rdst or BRA with operand
+        let ext_data = ext.dest_extension();
+        let rs = lower_nibble as u8;
+
+        // Check if there's an additional operand word
+        if rs == 0 && remaining.len() >= 2 {
+            // BRA #imm20 or BRA &abs20
+            let operand_low = u16::from_le_bytes([remaining[0], remaining[1]]);
+            let operand20 = ((ext_data as u32) << 16) | (operand_low as u32);
+            // Distinguish between immediate and absolute based on instruction encoding
+            // For simplicity, treat as absolute address for branch target
+            let dest = operand::Operand::Absolute20(operand20);
+            return Ok(Instruction::Bra(Bra::new(dest)));
+        } else {
+            // BRA Rdst (register direct)
+            let dest = operand::Operand::RegisterDirect(rs);
+            return Ok(Instruction::Bra(Bra::new(dest)));
+        }
+    }
+
     Err(DecodeError::InvalidOpcode(upper_byte as u16))
 }
 

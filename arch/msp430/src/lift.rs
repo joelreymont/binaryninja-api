@@ -802,6 +802,21 @@ pub(crate) fn lift_instruction(inst: &Instruction, addr: u64, il: &LowLevelILMut
             let op = il.sub(3, dest, src).with_flag_write(FlagWrite::All).build();
             msp430x_address_write(inst.destination(), il, op);
         }
+        Instruction::Bra(inst) => {
+            // 20-bit unconditional branch (jump)
+            let dest = if let Operand::Immediate20(dest) = inst.destination() {
+                il.const_ptr(*dest as u64)
+            } else if let Operand::Immediate(dest) = inst.destination() {
+                il.const_ptr(*dest as u64)
+            } else if let Operand::Absolute20(dest) = inst.destination() {
+                il.const_ptr(*dest as u64)
+            } else if let Operand::Absolute(dest) = inst.destination() {
+                il.const_ptr(*dest as u64)
+            } else {
+                lift_source_operand(inst.destination(), 3, il)
+            };
+            il.jump(dest).append();
+        }
         Instruction::Calla(inst) => {
             // 20-bit call - similar to CALL but with 3-byte addressing
             let src = if let Operand::Immediate20(src) = inst.destination() {

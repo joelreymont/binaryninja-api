@@ -186,6 +186,35 @@ impl Architecture for Msp430 {
                         info.add_branch(BranchKind::FunctionReturn);
                     }
                     // MSP430X extended instructions
+                    Instruction::Bra(inst) => match inst.destination() {
+                        Operand::RegisterDirect(_) => info.add_branch(BranchKind::Indirect),
+                        Operand::Indexed(_) | Operand::Indexed20(_) => {
+                            info.add_branch(BranchKind::Indirect)
+                        }
+                        Operand::Absolute(value) => {
+                            info.add_branch(BranchKind::Unconditional(*value as u64))
+                        }
+                        Operand::Absolute20(value) => {
+                            info.add_branch(BranchKind::Unconditional(*value as u64))
+                        }
+                        Operand::Symbolic(offset) => info.add_branch(
+                            BranchKind::Unconditional((addr as i64 + *offset as i64) as u64),
+                        ),
+                        Operand::Symbolic20(offset) => info.add_branch(
+                            BranchKind::Unconditional((addr as i64 + *offset as i64) as u64),
+                        ),
+                        Operand::Immediate(addr) => {
+                            info.add_branch(BranchKind::Unconditional(*addr as u64))
+                        }
+                        Operand::Immediate20(addr) => {
+                            info.add_branch(BranchKind::Unconditional(*addr as u64))
+                        }
+                        Operand::Constant(_) => info.add_branch(BranchKind::Unconditional(addr)),
+                        Operand::RegisterIndirect(_)
+                        | Operand::RegisterIndirectAutoIncrement(_) => {
+                            info.add_branch(BranchKind::Indirect)
+                        }
+                    },
                     Instruction::Calla(inst) => match inst.destination() {
                         Operand::RegisterDirect(_) => info.add_branch(BranchKind::Indirect),
                         Operand::Indexed(_) | Operand::Indexed20(_) => {
@@ -488,6 +517,7 @@ fn generate_tokens(inst: &Instruction, addr: u64) -> Vec<InstructionTextToken> {
         Instruction::Cmpa(inst) => generate_msp430x_address_tokens(inst, addr),
         Instruction::Adda(inst) => generate_msp430x_address_tokens(inst, addr),
         Instruction::Suba(inst) => generate_msp430x_address_tokens(inst, addr),
+        Instruction::Bra(inst) => generate_msp430x_bra_tokens(inst, addr),
         Instruction::Calla(inst) => generate_msp430x_calla_tokens(inst, addr),
         Instruction::Reta(_) => vec![InstructionTextToken::new(
             "reta",
@@ -926,6 +956,28 @@ fn generate_msp430x_calla_tokens(
 
     if "calla".len() < MIN_MNEMONIC {
         let padding = " ".repeat(MIN_MNEMONIC - "calla".len());
+        res.push(InstructionTextToken::new(
+            padding,
+            InstructionTextTokenKind::Text,
+        ));
+    }
+
+    res.extend_from_slice(&generate_operand_tokens(inst.destination(), addr, true));
+
+    res
+}
+
+fn generate_msp430x_bra_tokens(
+    inst: &msp430_asm_extended::msp430x_instructions::Bra,
+    addr: u64,
+) -> Vec<InstructionTextToken> {
+    let mut res = vec![InstructionTextToken::new(
+        "bra",
+        InstructionTextTokenKind::Instruction,
+    )];
+
+    if "bra".len() < MIN_MNEMONIC {
+        let padding = " ".repeat(MIN_MNEMONIC - "bra".len());
         res.push(InstructionTextToken::new(
             padding,
             InstructionTextTokenKind::Text,
